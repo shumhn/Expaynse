@@ -311,10 +311,11 @@ export default function PeoplePage() {
   const [hasShownPayrollGuideForWallet, setHasShownPayrollGuideForWallet] = useState<string | null>(null);
   const hasShownPayrollGuide = !!walletAddr && hasShownPayrollGuideForWallet === walletAddr;
   const isPayrollGuideOpen = !!walletAddr && payrollGuideOpenForWallet === walletAddr;
-  const { hasCompleted: hasCompletedPayrollGuide } = useGuideStatus(
-    "payroll-modes",
-    payrollGuideScope,
-  );
+  const payrollGuideMilestoneCompleted = employees.length > 0;
+  const {
+    hasCompleted: hasCompletedPayrollGuide,
+    markCompleted: markPayrollGuideCompleted,
+  } = useGuideStatus("payroll-modes", payrollGuideScope);
   const firstPayrollGuideTarget = PAYROLL_MODE_GUIDE_STEPS[0]?.target;
   const isPayrollGuideTargetReady = useGuideTargetReady(firstPayrollGuideTarget, {
     enabled: showAdd && !hasCompletedPayrollGuide && !hasShownPayrollGuide,
@@ -328,6 +329,29 @@ export default function PeoplePage() {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!walletAddr) {
+      setPayrollGuideOpenForWallet(null);
+      setHasShownPayrollGuideForWallet(null);
+    }
+  }, [walletAddr]);
+
+  useEffect(() => {
+    if (payrollGuideMilestoneCompleted && !hasCompletedPayrollGuide) {
+      markPayrollGuideCompleted();
+    }
+  }, [
+    payrollGuideMilestoneCompleted,
+    hasCompletedPayrollGuide,
+    markPayrollGuideCompleted,
+  ]);
+
+  useEffect(() => {
+    if (hasCompletedPayrollGuide) {
+      setPayrollGuideOpenForWallet(null);
+    }
+  }, [hasCompletedPayrollGuide]);
 
   useEffect(() => {
     if (
@@ -1580,6 +1604,7 @@ export default function PeoplePage() {
         onComplete={() => setPayrollGuideOpenForWallet(null)}
         storageKeyPrefix="payroll-modes"
         storageScopeKey={payrollGuideScope}
+        persistCompletion={false}
       />
 
       {streamModalEmployee && (

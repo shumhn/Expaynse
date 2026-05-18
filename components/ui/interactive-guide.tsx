@@ -386,7 +386,14 @@ export function useGuideStatus(
     notifyGuideStorageChange(completionKey);
   };
 
-  return { hasCompleted, resetGuide };
+  const markCompleted = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(completionKey, 'true');
+    window.localStorage.removeItem(stepKey);
+    notifyGuideStorageChange(completionKey);
+  };
+
+  return { hasCompleted, resetGuide, markCompleted };
 }
 
 export function useGuideTargetReady(

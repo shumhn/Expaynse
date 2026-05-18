@@ -234,10 +234,12 @@ export default function DashboardPage() {
   const dashboardGuideScope = walletAddr || "guest";
   const hasShownDashboardGuide = !!walletAddr && hasShownDashboardGuideForWallet === walletAddr;
   const isDashboardGuideOpen = !!walletAddr && dashboardGuideOpenForWallet === walletAddr;
-  const { hasCompleted: hasCompletedDashboardGuide } = useGuideStatus(
-    "dashboard-onboarding",
-    dashboardGuideScope,
-  );
+  const dashboardGuideMilestoneCompleted =
+    !!company?.id && vaultBalance > 0 && employees.length > 0;
+  const {
+    hasCompleted: hasCompletedDashboardGuide,
+    markCompleted: markDashboardGuideCompleted,
+  } = useGuideStatus("dashboard-onboarding", dashboardGuideScope);
   const firstDashboardGuideTarget = (company ? ACTIVE_COMPANY_STEPS : FIRST_TIME_SETUP_STEPS)[0]?.target;
   const isDashboardGuideTargetReady = useGuideTargetReady(firstDashboardGuideTarget, {
     enabled:
@@ -253,6 +255,29 @@ export default function DashboardPage() {
   useEffect(() => {
     companyRef.current = company;
   }, [company]);
+
+  useEffect(() => {
+    if (!connected || !walletAddr) {
+      setDashboardGuideOpenForWallet(null);
+      setHasShownDashboardGuideForWallet(null);
+    }
+  }, [connected, walletAddr]);
+
+  useEffect(() => {
+    if (dashboardGuideMilestoneCompleted && !hasCompletedDashboardGuide) {
+      markDashboardGuideCompleted();
+    }
+  }, [
+    dashboardGuideMilestoneCompleted,
+    hasCompletedDashboardGuide,
+    markDashboardGuideCompleted,
+  ]);
+
+  useEffect(() => {
+    if (hasCompletedDashboardGuide) {
+      setDashboardGuideOpenForWallet(null);
+    }
+  }, [hasCompletedDashboardGuide]);
 
   useEffect(() => {
     if (!walletAddr) return;
@@ -791,6 +816,7 @@ export default function DashboardPage() {
         onComplete={() => setDashboardGuideOpenForWallet(null)}
         storageKeyPrefix="dashboard-onboarding"
         storageScopeKey={dashboardGuideScope}
+        persistCompletion={false}
       />
     </EmployerLayout>
   );
