@@ -10,6 +10,7 @@ import {
   getBalance,
 } from "@/lib/magicblock-api";
 import { walletAuthenticatedFetch } from "@/lib/client/wallet-auth-fetch";
+import { enqueuePendingSetupAction } from "@/lib/client/history-queue";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -155,13 +156,29 @@ export function DepositModal({ isOpen, onClose, baseBalance = 0, privateBalance 
             });
           } catch (historyErr) {
             console.error("Failed to save deposit to history", historyErr);
+            enqueuePendingSetupAction({
+              kind: "setup-action",
+              wallet: owner,
+              type: FUNDING_HISTORY_TYPE,
+              amount: val,
+              txSig: sig,
+              status: "success",
+            });
             toast.warning(
-              "Deposit succeeded, but history tracking failed. Treasury analytics may show 0 until this is fixed.",
+              "Deposit succeeded, but history tracking failed. We'll retry automatically in the background.",
             );
           }
         } else {
+          enqueuePendingSetupAction({
+            kind: "setup-action",
+            wallet: owner,
+            type: FUNDING_HISTORY_TYPE,
+            amount: val,
+            txSig: sig,
+            status: "success",
+          });
           toast.warning(
-            "Deposit succeeded, but this wallet cannot sign messages so history/analytics will not update.",
+            "Deposit succeeded, but this wallet can't sign messages. History/analytics will sync once message signing is available.",
           );
         }
 
