@@ -311,6 +311,14 @@ export async function POST(request: NextRequest) {
           return badRequest("status must be success or failed");
         }
 
+        if (
+          body.type === "fund-treasury" &&
+          body.status === "success" &&
+          (!body.txSig || !body.txSig.trim())
+        ) {
+          return badRequest("txSig is required for successful fund-treasury actions");
+        }
+
         const setupAction = await saveSetupAction({
           wallet: body.wallet,
           type: body.type,

@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState, useMemo, useRef } from "rea
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Loader2, Landmark, TrendingUp, Zap, AlertTriangle, Users, RefreshCw, Plus, ArrowDownLeft, ArrowUpRight, History, CalendarDays, CheckCircle2, XCircle, Search, Calendar, ShieldCheck, Clock, Download, ArrowUpFromLine } from "lucide-react";
+import { Loader2, Landmark, TrendingUp, Zap, Users, RefreshCw, Plus, ArrowDownLeft, ArrowUpRight, History, CalendarDays, CheckCircle2, XCircle, Search, Calendar, ShieldCheck, Clock, Download, ArrowUpFromLine } from "lucide-react";
 import { EmployerLayout } from "@/components/employer-layout";
 import { walletAuthenticatedFetch } from "@/lib/client/wallet-auth-fetch";
 import { DepositModal } from "@/components/deposit-modal";
@@ -63,9 +63,6 @@ function TreasuryPageContent() {
   const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
   const hasShownHistoryErrorRef = useRef(false);
   const [pendingHistoryCount, setPendingHistoryCount] = useState(0);
-  const [backfillAmount, setBackfillAmount] = useState("");
-  const [backfillTxSig, setBackfillTxSig] = useState("");
-  const [backfillLoading, setBackfillLoading] = useState(false);
 
   const [filterTab, setFilterTab] = useState<"All" | "Deposits" | "Payouts">("All");
   const [payrollModeFilter, setPayrollModeFilter] = useState<"All" | "Streaming" | "Private Payroll">("All");
@@ -209,8 +206,20 @@ function TreasuryPageContent() {
   const totalPaid = streams.reduce((sum, s) => sum + s.totalPaid, 0);
   const dailyBurn = active.reduce((sum, s) => sum + s.ratePerSecond * 86400, 0);
 
+  const verifiedSetupActions = useMemo(
+    () =>
+      setupActions.filter(
+        (action) =>
+          action.type === "fund-treasury" &&
+          action.status === "success" &&
+          typeof action.txSig === "string" &&
+          action.txSig.trim().length > 0,
+      ),
+    [setupActions],
+  );
+
   const transactions: Transaction[] = [
-    ...setupActions.filter(a => a.type === "fund-treasury").map(a => ({
+    ...verifiedSetupActions.map(a => ({
       id: a.id,
       date: a.date,
       type: "Private Vault Deposit" as const,
@@ -269,60 +278,8 @@ function TreasuryPageContent() {
     });
   }, [filterTab, payrollModeFilter, searchQuery, transactions]);
 
-  const trackedDeposited = setupActions
-    .filter((action) => action.type === "fund-treasury")
+  const trackedDeposited = verifiedSetupActions
     .reduce((sum, action) => sum + (action.amount || 0), 0);
-  const inferredDeposited =
-    trackedDeposited === 0 && setupActions.length === 0 && (balance ?? 0) > 0
-      ? (balance ?? 0)
-      : trackedDeposited;
-  const depositsAreInferred = inferredDeposited !== trackedDeposited;
-  const needsDepositBackfill =
-    !historyLoadError && (balance ?? 0) > 0 && trackedDeposited < (balance ?? 0);
-
-  const submitDepositBackfill = useCallback(async () => {
-    if (!walletAddr || !signMessage) return;
-    const amount = Number.parseFloat(backfillAmount);
-    const txSig = backfillTxSig.trim();
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Enter a valid deposit amount");
-      return;
-    }
-    if (!txSig) {
-      toast.error("Enter the transaction signature");
-      return;
-    }
-
-    setBackfillLoading(true);
-    try {
-      const res = await walletAuthenticatedFetch({
-        path: "/api/history",
-        method: "POST",
-        signMessage,
-        wallet: walletAddr,
-        body: {
-          kind: "setup-action",
-          wallet: walletAddr,
-          type: "fund-treasury",
-          amount,
-          txSig,
-          status: "success",
-        },
-      });
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        throw new Error(json.error || "Failed to backfill deposit history");
-      }
-      toast.success("Deposit history backfilled");
-      setBackfillAmount("");
-      setBackfillTxSig("");
-      void fetchData();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to backfill deposit history");
-    } finally {
-      setBackfillLoading(false);
-    }
-  }, [walletAddr, signMessage, backfillAmount, backfillTxSig, fetchData]);
 
   const handleExportCSV = () => {
     if (filteredTransactions.length === 0) {
@@ -366,20 +323,12 @@ function TreasuryPageContent() {
   // Analytics Data — dynamic range
   const allTxDates = useMemo(() => {
     const items: { date: string; amount: number }[] = [
-      ...setupActions
-        .filter((action) => action.type === "fund-treasury")
+      ...verifiedSetupActions
         .map((action) => ({ date: action.date, amount: action.amount || 0 })),
       ...payrollRuns.map((run) => ({ date: run.date, amount: run.totalAmount })),
     ];
-
-    // If deposits were not tracked in history but the vault balance is > 0,
-    // show at least one inferred deposit so charts don't look broken.
-    if (items.length === 0 && depositsAreInferred && inferredDeposited > 0) {
-      items.push({ date: new Date().toISOString(), amount: inferredDeposited });
-    }
-
     return items;
-  }, [setupActions, payrollRuns, depositsAreInferred, inferredDeposited]);
+  }, [verifiedSetupActions, payrollRuns]);
 
   const volumeData = useMemo(() => {
     const now = new Date();
@@ -450,7 +399,7 @@ function TreasuryPageContent() {
   }, [chartRange, allTxDates]);
 
   const distributionData = useMemo(() => {
-    const depositsTotal = inferredDeposited;
+    const depositsTotal = trackedDeposited;
     const payrollTotal = payrollRuns.reduce((sum, a) => sum + a.totalAmount, 0);
     const claimsTotal = claimRecords.reduce((sum, a) => sum + a.amount, 0);
 
@@ -459,7 +408,7 @@ function TreasuryPageContent() {
       { name: "Payroll", value: payrollTotal, color: "#3b82f6" },
       { name: "Claims", value: claimsTotal, color: "#3b3b3b" },
     ].filter(d => d.value > 0);
-  }, [inferredDeposited, payrollRuns, claimRecords]);
+  }, [trackedDeposited, payrollRuns, claimRecords]);
 
   return (
     <EmployerLayout>
@@ -472,42 +421,6 @@ function TreasuryPageContent() {
         {!historyLoadError && pendingHistoryCount > 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#a8a8aa]">
             Syncing {pendingHistoryCount} pending deposit record(s) into history...
-          </div>
-        ) : null}
-        {needsDepositBackfill ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#a8a8aa]">
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={18} className="mt-0.5 text-amber-300" />
-              <div className="flex-1">
-                <p className="text-white font-semibold">Some deposits are missing from history.</p>
-                <p className="mt-1">
-                  Vault balance is {Number(balance ?? 0).toFixed(2)} USDC but tracked deposits are {trackedDeposited.toFixed(2)} USDC.
-                  This can happen if history tracking failed during a previous deposit.
-                </p>
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[140px_1fr_auto]">
-                  <input
-                    value={backfillAmount}
-                    onChange={(e) => setBackfillAmount(e.target.value)}
-                    placeholder="Amount (USDC)"
-                    className="h-10 rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-[#1eba98]/50"
-                    inputMode="decimal"
-                  />
-                  <input
-                    value={backfillTxSig}
-                    onChange={(e) => setBackfillTxSig(e.target.value)}
-                    placeholder="Transaction signature (Solscan)"
-                    className="h-10 rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white outline-none focus:border-[#1eba98]/50"
-                  />
-                  <button
-                    onClick={submitDepositBackfill}
-                    disabled={backfillLoading}
-                    className="h-10 rounded-xl bg-white px-4 text-xs font-bold uppercase tracking-widest text-black disabled:opacity-60"
-                  >
-                    {backfillLoading ? "Saving..." : "Backfill"}
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         ) : null}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -579,10 +492,8 @@ function TreasuryPageContent() {
 
           <div className="rounded-3xl border border-white/10 bg-[#0a0a0a] p-5 shadow-sm relative overflow-hidden">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a8a8aa]">Total Deposited</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight text-white">{inferredDeposited.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC</p>
-            <p className="mt-1 text-xs text-[#a8a8aa]">
-              {depositsAreInferred ? "Estimated from vault balance (history was missing)." : "Funds added to private vault"}
-            </p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-white">{trackedDeposited.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC</p>
+            <p className="mt-1 text-xs text-[#a8a8aa]">Funds added to private vault (verified tx history)</p>
             <div className="absolute top-5 right-5 text-[#1eba98]">
               <ArrowDownLeft size={20} />
             </div>
