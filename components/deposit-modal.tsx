@@ -155,7 +155,14 @@ export function DepositModal({ isOpen, onClose, baseBalance = 0, privateBalance 
             });
           } catch (historyErr) {
             console.error("Failed to save deposit to history", historyErr);
+            toast.warning(
+              "Deposit succeeded, but history tracking failed. Treasury analytics may show 0 until this is fixed.",
+            );
           }
+        } else {
+          toast.warning(
+            "Deposit succeeded, but this wallet cannot sign messages so history/analytics will not update.",
+          );
         }
 
         toast.success(FUNDING_SUCCESS_MESSAGE(val));

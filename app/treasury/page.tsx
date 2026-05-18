@@ -59,6 +59,8 @@ function TreasuryPageContent() {
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [claimRecords, setClaimRecords] = useState<ClaimRecord[]>([]);
   const [employees, setEmployees] = useState<{wallet: string, name: string}[]>([]);
+  const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
+  const hasShownHistoryErrorRef = useRef(false);
 
   const [filterTab, setFilterTab] = useState<"All" | "Deposits" | "Payouts">("All");
   const [payrollModeFilter, setPayrollModeFilter] = useState<"All" | "Streaming" | "Private Payroll">("All");
@@ -93,6 +95,8 @@ function TreasuryPageContent() {
     if (!walletAddr || !signMessage || !publicKey) return;
     setLoading(true);
     try {
+      setHistoryLoadError(null);
+      hasShownHistoryErrorRef.current = false;
       // 1. Fetch company data first
       let currentCompany = companyRef.current;
       if (!currentCompany) {
@@ -152,6 +156,16 @@ function TreasuryPageContent() {
         setSetupActions(h.setupActions ?? []);
         setPayrollRuns(h.payrollRuns ?? []);
         setClaimRecords(h.claimRecords ?? []);
+      } else {
+        const err = await historyRes
+          .json()
+          .catch(() => ({ error: "Failed to load history" })) as { error?: string };
+        const message = err.error || "Failed to load history";
+        setHistoryLoadError(message);
+        if (!hasShownHistoryErrorRef.current) {
+          hasShownHistoryErrorRef.current = true;
+          toast.warning(`History/analytics unavailable: ${message}`);
+        }
       }
       if (employeesRes.ok) {
         const e = await employeesRes.json();
@@ -373,6 +387,11 @@ function TreasuryPageContent() {
   return (
     <EmployerLayout>
       <div className="mx-auto max-w-6xl space-y-6">
+        {historyLoadError ? (
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            History/analytics are currently unavailable for this wallet. {historyLoadError}
+          </div>
+        ) : null}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">History & Analytics</h1>
