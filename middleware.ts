@@ -5,6 +5,8 @@ const PITCH_HOSTS = new Set([
   "www.pitch.expaynse.xyz",
 ]);
 
+const PUBLIC_FILE_REGEX = /\.[a-z0-9]+$/i;
+
 export function middleware(request: NextRequest) {
   const host = request.headers.get("host")?.toLowerCase() ?? "";
 
@@ -19,7 +21,10 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname === "/favicon.ico" ||
-    pathname.startsWith("/images")
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    pathname.startsWith("/images") ||
+    PUBLIC_FILE_REGEX.test(pathname)
   ) {
     return NextResponse.next();
   }
@@ -30,5 +35,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/:path*"],
 };
