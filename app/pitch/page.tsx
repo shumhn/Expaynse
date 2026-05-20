@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
   ChevronLeft, ChevronRight, Zap, Shield, Globe,
-  CheckCircle, User, DollarSign, Check, X
+  CheckCircle, DollarSign, Check, X
 } from "lucide-react";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -175,6 +175,85 @@ const slides = [
     ),
   },
   {
+    id: "architecture",
+    content: (
+      <div className="flex h-full w-full items-center justify-center px-5 pt-20 pb-24 md:px-6">
+        <div className="flex h-full w-full flex-col justify-center gap-4 md:hidden">
+          <div className="text-center">
+            <p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.32em] text-kast-teal">Architecture</p>
+            <h2 className="text-[30px] font-semibold leading-tight text-white">How Expaynse Works</h2>
+            <p className="mx-auto mt-3 max-w-[340px] text-[13px] font-semibold leading-relaxed text-gray-400">
+              Solana anchors payroll records. MagicBlock runs confidential transfers and real-time payroll.
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            <div className="rounded-2xl border border-white/10 bg-[#0c0c0c] p-5 shadow-xl">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-gray-500">Mode 1</p>
+                  <h3 className="mt-1 text-[22px] font-extrabold text-white">Private Payout</h3>
+                </div>
+                <span className="rounded-full border border-kast-teal/30 bg-kast-teal/10 px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.2em] text-kast-teal">
+                  Private API
+                </span>
+              </div>
+              <p className="mb-4 text-[13px] font-semibold leading-relaxed text-gray-400">
+                One-off or batch payroll without public salary exposure.
+              </p>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                {["Fund private treasury", "Send privately", "Employee private wallet"].map((step, idx) => (
+                  <div key={step} className="rounded-xl border border-white/10 bg-black px-2 py-3">
+                    <p className="mb-1 text-[10px] font-extrabold tracking-[0.2em] text-kast-teal">0{idx + 1}</p>
+                    <p className="text-[10px] font-extrabold leading-tight text-white">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-[#0c0c0c] p-5 shadow-xl">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-gray-500">Mode 2</p>
+                  <h3 className="mt-1 text-[22px] font-extrabold text-white">Real-time Streaming</h3>
+                </div>
+                <span className="rounded-full border border-kast-teal/30 bg-kast-teal/10 px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.2em] text-kast-teal">
+                  PER
+                </span>
+              </div>
+              <p className="mb-4 text-[13px] font-semibold leading-relaxed text-gray-400">
+                Salary accrues every second inside a selected date range.
+              </p>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                {["Set date range", "Accrue per sec", "Claim privately"].map((step, idx) => (
+                  <div key={step} className="rounded-xl border border-white/10 bg-black px-2 py-3">
+                    <p className="mb-1 text-[10px] font-extrabold tracking-[0.2em] text-kast-teal">0{idx + 1}</p>
+                    <p className="text-[10px] font-extrabold leading-tight text-white">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <motion.div
+          {...fadeUp}
+          transition={{ duration: 0.9, ease }}
+          className="relative hidden aspect-video w-full max-w-[1540px] overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.55)] md:block"
+        >
+          <Image
+            src="/pitch-architecture-expaynse.svg?v=6"
+            alt="Expaynse architecture overview showing private payout and real-time private streaming modes"
+            fill
+            priority
+            unoptimized
+            className="object-contain"
+          />
+        </motion.div>
+      </div>
+    ),
+  },
+  {
     id: "market-opportunity",
     content: (
       <div className="flex flex-col h-full justify-center max-w-7xl mx-auto px-6 w-full">
@@ -208,7 +287,7 @@ const slides = [
     content: (
       <div className="flex flex-col h-full justify-center max-w-6xl mx-auto px-6 w-full">
         <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-14">
-          <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-5">WHO IT'S FOR</p>
+          <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-5">WHO IT IS FOR</p>
           <h2 className="text-[44px] md:text-[50px] font-medium text-white tracking-tight">Target Markets</h2>
         </motion.div>
         <div className="grid md:grid-cols-2 gap-6">
