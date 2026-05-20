@@ -474,10 +474,6 @@ export default function PitchDeck() {
 
   return (
     <div className="fixed inset-0 bg-black text-white overflow-hidden flex flex-col z-[100] selection:bg-kast-teal/30 selection:text-black">
-      {/* Cyberpunk Grid Background */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1eba9802_2px,transparent_2px),linear-gradient(to_bottom,#1eba9802_2px,transparent_2px)] bg-[size:200px_200px] pointer-events-none" />
-      
       {/* Radial blur glows */}
       <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[800px] h-[800px] bg-kast-teal/[0.08] rounded-full blur-[130px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-kast-teal/[0.03] rounded-full blur-[100px] pointer-events-none" />
