@@ -242,7 +242,7 @@ const slides = [
           className="relative hidden aspect-video w-full max-w-[1540px] overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.55)] md:block"
         >
           <Image
-            src="/pitch-architecture-expaynse.svg?v=6"
+            src="/pitch-architecture-expaynse.svg?v=7"
             alt="Expaynse architecture overview showing private payout and real-time private streaming modes"
             fill
             priority
