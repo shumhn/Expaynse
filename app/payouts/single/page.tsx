@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -53,7 +53,7 @@ function resolveMode(raw: string | null): SinglePayoutMode {
   return raw === "stream" ? "stream" : "private";
 }
 
-export default function SinglePayoutSelectorPage() {
+function SinglePayoutSelectorContent() {
   const searchParams = useSearchParams();
   const { publicKey, signMessage } = useWallet();
 
@@ -312,5 +312,26 @@ export default function SinglePayoutSelectorPage() {
         </div>
       </div>
     </EmployerLayout>
+  );
+}
+
+function SinglePayoutFallback() {
+  return (
+    <EmployerLayout>
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <div className="rounded-2xl border border-white/10 bg-[#0a0a0a] p-10 text-center">
+          <Loader2 size={20} className="mx-auto mb-3 animate-spin text-[#1eba98]" />
+          <p className="text-sm text-[#a8a8aa]">Loading single payout...</p>
+        </div>
+      </div>
+    </EmployerLayout>
+  );
+}
+
+export default function SinglePayoutSelectorPage() {
+  return (
+    <Suspense fallback={<SinglePayoutFallback />}>
+      <SinglePayoutSelectorContent />
+    </Suspense>
   );
 }
