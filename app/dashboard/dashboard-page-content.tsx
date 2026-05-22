@@ -113,6 +113,17 @@ interface RealPayrollCycle {
   createdAt: string;
 }
 
+interface HistoryPayrollRun {
+  id: string;
+  date: string;
+  mode?: "streaming" | "private_payroll";
+  totalAmount: number;
+  employeeIds?: string[];
+  recipientAddresses?: string[];
+  employeeAmounts?: number[];
+  status: "success" | "failed" | "submitted";
+}
+
 function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -210,6 +221,7 @@ export default function DashboardPage() {
 
   const [runs, setRuns] = useState<RealPayrollRun[]>([]);
   const [cycles, setCycles] = useState<RealPayrollCycle[]>([]);
+  const [historyPayrollRuns, setHistoryPayrollRuns] = useState<HistoryPayrollRun[]>([]);
   const [employees, setEmployees] = useState<Array<{
     id: string; wallet: string; name: string; monthlySalaryUsd?: number;
     compensationAmountUsd?: number; compensationUnit?: string;
@@ -341,13 +353,14 @@ export default function DashboardPage() {
     if (!walletAddr || !signMessage) {
       setRuns([]);
       setCycles([]);
+      setHistoryPayrollRuns([]);
       setCompany(null);
       return;
     }
 
     setLoading(true);
     try {
-      const [runsRes, cyclesRes, empRes, strRes, compRes] = await Promise.all([
+      const [runsRes, cyclesRes, empRes, strRes, compRes, historyRes] = await Promise.all([
         walletAuthenticatedFetch({
           wallet: walletAddr,
           signMessage,
@@ -373,6 +386,11 @@ export default function DashboardPage() {
           signMessage,
           path: `/api/company/me?employerWallet=${walletAddr}`,
         }),
+        walletAuthenticatedFetch({
+          wallet: walletAddr,
+          signMessage,
+          path: `/api/history?wallet=${walletAddr}`,
+        }).catch(() => null),
       ]);
 
       const runsJson = (await runsRes.json()) as {
@@ -401,6 +419,14 @@ export default function DashboardPage() {
       if (compRes.ok) {
         const compJson = await compRes.json();
         setCompany(compJson.company || null);
+      }
+      if (historyRes && historyRes.ok) {
+        const historyJson = (await historyRes.json()) as {
+          payrollRuns?: HistoryPayrollRun[];
+        };
+        setHistoryPayrollRuns(historyJson.payrollRuns ?? []);
+      } else {
+        setHistoryPayrollRuns([]);
       }
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Dashboard load failed");
@@ -456,6 +482,84 @@ export default function DashboardPage() {
     [runs],
   );
 
+  const privateTransferRuns = useMemo(
+    () =>
+      historyPayrollRuns.filter(
+        (run) =>
+          run.mode === "private_payroll" &&
+          run.status !== "failed" &&
+          Number.isFinite(run.totalAmount) &&
+          run.totalAmount > 0,
+      ),
+    [historyPayrollRuns],
+  );
+
+  const currentMonthPrivateTransferBurn = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    let sum = 0;
+
+    for (const run of privateTransferRuns) {
+      const date = new Date(run.date);
+      if (date.getFullYear() === year && date.getMonth() === month) {
+        sum += run.totalAmount;
+      }
+    }
+    return sum;
+  }, [privateTransferRuns]);
+
+  const privateTransferDisbursed = useMemo(
+    () => privateTransferRuns.reduce((sum, run) => sum + run.totalAmount, 0),
+    [privateTransferRuns],
+  );
+
+  const privateTransferAllocations = useMemo(() => {
+    const byEmployeeId = new Map(employees.map((employee) => [employee.id, employee]));
+    const byWallet = new Map(
+      employees.map((employee) => [employee.wallet.toLowerCase(), employee]),
+    );
+
+    const allocations: Array<{ employeeId: string; amountUsd: number }> = [];
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    for (const run of privateTransferRuns) {
+      const runDate = new Date(run.date);
+      if (runDate.getFullYear() !== year || runDate.getMonth() !== month) continue;
+
+      if (Array.isArray(run.employeeIds) && Array.isArray(run.employeeAmounts)) {
+        const pairedLength = Math.min(run.employeeIds.length, run.employeeAmounts.length);
+        for (let i = 0; i < pairedLength; i += 1) {
+          const employeeId = run.employeeIds[i];
+          const amountUsd = Number(run.employeeAmounts[i] ?? 0);
+          if (!employeeId || !Number.isFinite(amountUsd) || amountUsd <= 0) continue;
+          if (!byEmployeeId.has(employeeId)) continue;
+          allocations.push({ employeeId, amountUsd });
+        }
+        continue;
+      }
+
+      const recipients = run.recipientAddresses ?? [];
+      const amounts = run.employeeAmounts ?? [];
+      const fallbackAmountEach =
+        recipients.length > 0 ? run.totalAmount / recipients.length : 0;
+
+      for (let i = 0; i < recipients.length; i += 1) {
+        const recipient = recipients[i]?.toLowerCase();
+        if (!recipient) continue;
+        const employee = byWallet.get(recipient);
+        if (!employee) continue;
+        const amountUsd = Number(amounts[i] ?? fallbackAmountEach);
+        if (!Number.isFinite(amountUsd) || amountUsd <= 0) continue;
+        allocations.push({ employeeId: employee.id, amountUsd });
+      }
+    }
+
+    return allocations;
+  }, [employees, privateTransferRuns]);
+
   const activeStreamsCount = useMemo(() => {
     let count = 0;
     for (const emp of employees) {
@@ -469,7 +573,7 @@ export default function DashboardPage() {
 
   const totalEmployees = employees.length;
 
-  const monthlyBurnRate = useMemo(() => {
+  const monthlyStreamingBurnRate = useMemo(() => {
     let sum = 0;
     for (const emp of employees) {
       const stream = streams.find((s) => s.employeeId === emp.id);
@@ -488,9 +592,16 @@ export default function DashboardPage() {
     return sum;
   }, [employees, streams]);
 
+  const monthlyBurnRate = useMemo(
+    () => monthlyStreamingBurnRate + currentMonthPrivateTransferBurn,
+    [monthlyStreamingBurnRate, currentMonthPrivateTransferBurn],
+  );
+
   const totalDisbursed = useMemo(
-    () => streams.reduce((sum, s) => sum + (s.totalPaid ?? 0), 0),
-    [streams],
+    () =>
+      streams.reduce((sum, s) => sum + (s.totalPaid ?? 0), 0) +
+      privateTransferDisbursed,
+    [streams, privateTransferDisbursed],
   );
 
   const failedRuns = useMemo(
@@ -684,7 +795,11 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <RunwayProjectionChart vaultBalance={vaultBalance} monthlyBurnRate={monthlyBurnRate} />
-              <CompensationBreakdownChart employees={employees} streams={streams} />
+              <CompensationBreakdownChart
+                employees={employees}
+                streams={streams}
+                privateTransferAllocations={privateTransferAllocations}
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

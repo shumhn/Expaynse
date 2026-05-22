@@ -21,9 +21,18 @@ export interface Stream {
 interface CompensationChartProps {
   employees: Employee[];
   streams: Stream[];
+  privateTransferAllocations?: Array<{
+    employeeId: string;
+    amountUsd: number;
+  }>;
 }
 
-function computeAllocation(employees: Employee[], streams: Stream[]) {
+function computeAllocation(
+  employees: Employee[],
+  streams: Stream[],
+  privateTransferAllocations: Array<{ employeeId: string; amountUsd: number }>,
+) {
+  const byEmployeeId = new Map(employees.map((employee) => [employee.id, employee]));
   const deptTotals: Record<string, number> = {};
   let total = 0;
 
@@ -36,6 +45,15 @@ function computeAllocation(employees: Employee[], streams: Stream[]) {
       deptTotals[dept] = (deptTotals[dept] || 0) + monthly;
       total += monthly;
     }
+  }
+
+  for (const allocation of privateTransferAllocations) {
+    if (!Number.isFinite(allocation.amountUsd) || allocation.amountUsd <= 0) continue;
+    const emp = byEmployeeId.get(allocation.employeeId);
+    if (!emp) continue;
+    const dept = emp.department || "Other";
+    deptTotals[dept] = (deptTotals[dept] || 0) + allocation.amountUsd;
+    total += allocation.amountUsd;
   }
 
   if (total === 0) return [];
@@ -69,15 +87,22 @@ function CustomTooltip({
   return null
 }
 
-export function CompensationBreakdownChart({ employees, streams }: CompensationChartProps) {
-  const data = useMemo(() => computeAllocation(employees, streams), [employees, streams]);
+export function CompensationBreakdownChart({
+  employees,
+  streams,
+  privateTransferAllocations = [],
+}: CompensationChartProps) {
+  const data = useMemo(
+    () => computeAllocation(employees, streams, privateTransferAllocations),
+    [employees, streams, privateTransferAllocations],
+  );
   const isEmpty = data.length === 0;
 
   return (
     <Card className="relative">
       <CardHeader>
         <CardTitle>Burn by Department</CardTitle>
-        <CardDescription>Breakdown of active streams by department</CardDescription>
+        <CardDescription>Breakdown of active streams and private payouts by department</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[280px] w-full min-w-0 transition-opacity duration-300">
@@ -85,7 +110,7 @@ export function CompensationBreakdownChart({ employees, streams }: CompensationC
             <div className="flex h-full items-center justify-center text-center">
               <div>
                 <p className="text-sm font-semibold text-white">No active stream data yet</p>
-                <p className="mt-2 text-xs text-[#a8a8aa]">Department allocation appears once live payroll streams are running.</p>
+                <p className="mt-2 text-xs text-[#a8a8aa]">Department allocation appears once stream or private transfer activity exists.</p>
               </div>
             </div>
           ) : (

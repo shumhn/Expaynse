@@ -37,6 +37,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Home", href: "/dashboard", icon: LayoutDashboard, role: "employer" },
   { label: "Employee", href: "/people", icon: Users, role: "employer" },
+  { label: "Payouts", href: "/payouts", icon: Banknote, role: "employer" },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck, role: "employer" },
   { label: "Dashboard", href: "/claim/dashboard", icon: LayoutDashboard, role: "employee" },
   { label: "Balances", href: "/claim/balances", icon: Wallet, role: "employee" },
@@ -69,6 +70,8 @@ export function AppSidebar({
     pathname?.startsWith("/compliance/") ||
     pathname === "/people" ||
     pathname?.startsWith("/people/") ||
+    pathname === "/payouts" ||
+    pathname?.startsWith("/payouts/") ||
     pathname === "/disburse" ||
     pathname?.startsWith("/disburse/") ||
     pathname === "/treasury" ||

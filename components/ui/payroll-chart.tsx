@@ -70,7 +70,7 @@ export function RunwayProjectionChart({ vaultBalance, monthlyBurnRate }: RunwayC
     <Card className="relative">
       <CardHeader>
         <CardTitle>Treasury Runway Projection</CardTitle>
-        <CardDescription>Estimated vault depletion based on active streams</CardDescription>
+        <CardDescription>Estimated vault depletion based on stream burn and private payouts</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[280px] w-full min-w-0 transition-opacity duration-300">

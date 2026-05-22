@@ -36,6 +36,8 @@ import {
   RotateCcw,
   CalendarDays,
   AlertTriangle,
+  PauseCircle,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { EmployerLayout } from "@/components/employer-layout";
@@ -239,23 +241,60 @@ function EmployerPageContent() {
       const preview = stream ? (privateStates[stream.id] ?? null) : null;
       const status = resolveStatusWithMissing(stream, preview) ?? "paused";
       const ratePerSecond = stream?.ratePerSecond ?? 0;
-      const employeeCycle = getScheduleCycleSnapshot(
-        employee.paySchedule,
-        new Date(nowMs),
-      );
+
+      // Use stream-specific date range when available (calendar-driven mode),
+      // otherwise fall back to the generic schedule-based cycle.
+      const streamStartsAt = stream?.startsAt ?? employee.startDate ?? null;
+      const streamEndsAt = stream?.endsAt ?? stream?.compensationSnapshot?.endsAt ?? null;
+      const hasStreamRange = Boolean(streamStartsAt && streamEndsAt);
+
+      let cycleLabel: string;
+      let cycleTarget: number;
+      let streamedSoFar: number;
+
+      if (hasStreamRange && streamStartsAt && streamEndsAt) {
+        // Calendar-driven: use the stream's explicit date range
+        const startMs = new Date(streamStartsAt).getTime();
+        const endMs = new Date(streamEndsAt).getTime();
+        const durationSeconds = Math.max(1, Math.floor((endMs - startMs) / 1000));
+
+        cycleLabel = `${new Date(streamStartsAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        })} – ${new Date(streamEndsAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        })}`;
+
+        cycleTarget = ratePerSecond > 0 ? ratePerSecond * durationSeconds : 0;
+
+        const accrualStartMs = startMs;
+        const accrualEndMs = Math.min(nowMs, endMs);
+        const elapsedSeconds = Math.max(0, Math.floor((accrualEndMs - accrualStartMs) / 1000));
+        streamedSoFar = Math.min(cycleTarget, ratePerSecond * elapsedSeconds);
+      } else {
+        // Legacy: generic schedule-based cycle
+        const employeeCycle = getScheduleCycleSnapshot(
+          employee.paySchedule,
+          new Date(nowMs),
+        );
+        cycleLabel = employeeCycle.label;
+        cycleTarget = ratePerSecond > 0 ? ratePerSecond * employeeCycle.totalSeconds : 0;
+        streamedSoFar = Math.min(
+          Math.max(cycleTarget, 0),
+          getAccruedInCycle({
+            ratePerSecond,
+            cycleStart: employeeCycle.start,
+            cycleTotalSeconds: employeeCycle.totalSeconds,
+            nowMs,
+            startsAt: stream?.startsAt ?? employee.startDate ?? null,
+          }),
+        );
+      }
+
       const monthlySalary = ratePerSecondToMonthlyUsd(ratePerSecond);
-      const cycleTarget =
-        ratePerSecond > 0 ? ratePerSecond * employeeCycle.totalSeconds : 0;
-      const streamedSoFar = Math.min(
-        Math.max(cycleTarget, 0),
-        getAccruedInCycle({
-          ratePerSecond,
-          cycleStart: employeeCycle.start,
-          cycleTotalSeconds: employeeCycle.totalSeconds,
-          nowMs,
-          startsAt: stream?.startsAt ?? employee.startDate ?? null,
-        }),
-      );
       const claimableNow = preview
         ? Number(preview.state.effectiveClaimableAmountMicro) / 1_000_000
         : null;
@@ -264,7 +303,7 @@ function EmployerPageContent() {
 
       return {
         employee,
-        cycleLabel: employeeCycle.label,
+        cycleLabel,
         status: perStatus,
         ratePerSecond,
         monthlySalary,
@@ -1521,8 +1560,8 @@ function EmployerPageContent() {
       if (action === "resume" && privateInitStatus !== "confirmed") {
         toast.info(
           privateInitStatus === "failed"
-            ? "The employee's private recipient setup failed. Ask them to open Claim > Withdraw and initialize it before resuming payroll."
-            : "The employee must initialize their private recipient before this stream can go live.",
+            ? "Private recipient setup failed. The system will retry automatically, or use Retry Init from Employees before resuming payroll."
+            : "Private recipient setup is still pending. Wait for auto-init or use Retry Init from Employees.",
         );
         return;
       }
@@ -2535,8 +2574,8 @@ function EmployerPageContent() {
       if (currentPrivateInitStatus !== "confirmed") {
         toast.info(
           currentPrivateInitStatus === "failed"
-            ? "The employee's private recipient setup failed. Ask them to open Claim > Withdraw and initialize it before going live."
-            : "The employee must initialize their private recipient before this stream can go live.",
+            ? "Private recipient setup failed. The system will retry automatically, or use Retry Init from Employees before going live."
+            : "Private recipient setup is still pending. Wait for auto-init or use Retry Init from Employees.",
         );
         return;
       }
@@ -3543,41 +3582,39 @@ function EmployerPageContent() {
                       return (
                         <div
                           key={employee.id}
-                          className="rounded-sm border border-white/15 bg-[#0a0a0a] overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                          className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_32%),linear-gradient(180deg,rgba(14,14,16,0.98),rgba(8,8,9,1))] shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
                         >
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 pt-5 pb-4">
-                            {!focusedEmployeeId ? (
+                          <div className="flex flex-col gap-4 px-6 pt-6 pb-5 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex min-w-0 items-start gap-4">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm font-bold text-white shadow-inner">
+                                {employee.name?.charAt(0)?.toUpperCase() ?? "?"}
+                              </div>
                               <div className="min-w-0">
-                                <p className="text-white font-bold text-base tracking-tight truncate">
+                                <p className="truncate text-lg font-bold tracking-tight text-white">
                                   {employee.name}
                                 </p>
                                 {(employee.role || employee.department) && (
-                                  <p className="text-[11px] text-[#a8a8aa] mt-0.5 truncate">
+                                  <p className="mt-1 truncate text-[11px] text-[#a8a8aa]">
                                     {[employee.role, employee.department]
                                       .filter(Boolean)
                                       .join(" · ")}
                                   </p>
                                 )}
-                                <p className="font-mono text-[10px] text-[#8f8f95] mt-0.5 tracking-wider">
+                                <p className="mt-1 font-mono text-[11px] tracking-[0.18em] text-[#8f8f95]">
                                   {employee.wallet.slice(0, 6)}...
                                   {employee.wallet.slice(-6)}
                                 </p>
                                 {employee.notes &&
                                   employee.notes !== "__open__" && (
-                                    <p className="text-[11px] text-[#a8a8aa] mt-1 truncate italic">
+                                    <p className="mt-2 truncate text-[11px] italic text-[#8f8f95]">
                                       {employee.notes}
                                     </p>
                                   )}
                               </div>
-                            ) : (
-                              <p className="font-mono text-[11px] text-[#8f8f95] tracking-[0.18em]">
-                                {employee.wallet.slice(0, 6)}...
-                                {employee.wallet.slice(-6)}
-                              </p>
-                            )}
-                            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
                               <span
-                                className={`px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-widest border shadow-sm ${needsPayrollSync
+                                className={`inline-flex items-center rounded-full border px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.22em] ${needsPayrollSync
                                   ? "bg-amber-500/10 text-amber-300 border-amber-400/30"
                                   : effectiveStatus === "active"
                                   ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
@@ -3591,7 +3628,7 @@ function EmployerPageContent() {
                                 {needsPayrollSync ? "needs sync" : effectiveStatus ?? "draft"}
                               </span>
                               <span
-                                className={`px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-widest border shadow-sm ${isOnboarded
+                                className={`inline-flex items-center rounded-full border px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.22em] ${isOnboarded
                                   ? "bg-[#0f0f10] text-white border-white/10"
                                   : "bg-[#111111] text-[#a8a8aa] border-white/15"
                                   }`}
@@ -3599,38 +3636,38 @@ function EmployerPageContent() {
                                 {isOnboarded ? "PER LIVE" : "PER PENDING"}
                               </span>
                               <span
-                                className={`px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-widest border shadow-sm ${privateInitBadge.className}`}
+                                className={`inline-flex items-center rounded-full border px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.22em] ${privateInitBadge.className}`}
                               >
                                 {privateInitBadge.label}
                               </span>
                               {observedCheckpointStatus === "stale" ? (
-                                <span className="px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-widest border bg-amber-500/10 text-amber-300 border-amber-400/30 shadow-sm">
+                                <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-amber-500/10 px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.22em] text-amber-300">
                                   sync stale
                                 </span>
                               ) : null}
                               {stream && pendingRequests.length > 0 ? (
-                                <span className="px-3 py-1 rounded-sm text-[9px] font-bold uppercase tracking-widest border bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/30 shadow-sm animate-pulse">
+                                <span className="inline-flex items-center rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-[0.22em] text-fuchsia-300 animate-pulse">
                                   CASHOUT ×{pendingRequests.length}
                                 </span>
                               ) : null}
                               {needsPayrollSync ? (
-                                <p className="w-full text-right text-[10px] text-amber-300 font-medium">
+                                <p className="w-full pt-1 text-[10px] font-medium text-amber-300 sm:text-right">
                                   Previous payment was sent. Finalize PER accounting with Sync Payroll State.
                                 </p>
                               ) : effectiveStatus === "stopped" ? (
-                                <p className="w-full text-right text-[10px] text-red-500 font-medium">
+                                <p className="w-full pt-1 text-[10px] font-medium text-rose-300 sm:text-right">
                                   Terminal state.
                                 </p>
                               ) : null}
                               {privateInitStatus === "failed" &&
                               employee.privateRecipientInitError ? (
-                                <p className="w-full text-right text-[10px] text-rose-300 font-medium">
-                                  {employee.privateRecipientInitError} Ask the employee to open Claim &gt; Withdraw and initialize.
+                                <p className="w-full pt-1 text-[10px] font-medium text-rose-300 sm:text-right">
+                                  {employee.privateRecipientInitError} Use Retry Init from Employees after funding sponsor/treasury if required.
                                 </p>
                               ) : privateInitStatus === "pending" ||
                                 privateInitStatus === "processing" ? (
-                                <p className="w-full text-right text-[10px] text-[#8f8f95] font-medium">
-                                  Employee can finish private setup later from Claim &gt; Withdraw.
+                                <p className="w-full pt-1 text-[10px] font-medium text-[#8f8f95] sm:text-right">
+                                  System auto-init is running. Retry Init is available from Employees if this remains pending.
                                 </p>
                               ) : null}
                             </div>
@@ -3647,254 +3684,120 @@ function EmployerPageContent() {
                             </div>
                           ) : null}
 
-                          <div className="h-px bg-[#111111] mx-5" />
+                          <div className="mx-6 h-px bg-white/5" />
 
-                          <div className="grid md:grid-cols-2 gap-4 px-5 py-4">
-                            <div>
-                              <label className="block text-[10px] text-[#8f8f95] uppercase tracking-[0.2em] font-bold mb-2">
-                                {focusedEmployeeId
-                                  ? "Payroll Terms"
-                                  : "Employee Profile Snapshot"}
-                              </label>
-                              <div className="rounded-sm border border-white/10 bg-[#111111] p-4">
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  <div className="rounded-sm border border-white/10 bg-[#0a0a0a] px-4 py-3 shadow-sm">
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#a8a8aa]">
-                                      Monthly salary
-                                    </p>
-                                    <p className="mt-2 text-lg font-bold text-white">
-                                      {formatUsd(
-                                        employee.monthlySalaryUsd ??
-                                        ratePerSecondToMonthlyUsd(
-                                          stream?.ratePerSecond ?? 0,
-                                        ),
-                                      )}
-                                    </p>
-                                  </div>
-                                  <div className="rounded-sm border border-white/10 bg-[#0a0a0a] px-4 py-3 shadow-sm">
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#a8a8aa]">
-                                      Statement cycle
-                                    </p>
-                                    <p className="mt-2 text-sm font-semibold capitalize text-white">
-                                      {(employee.paySchedule ?? "monthly").replaceAll(
-                                        "_",
-                                        " ",
-                                      )}
-                                    </p>
-                                  </div>
-                                  <div className="rounded-sm border border-white/10 bg-[#0a0a0a] px-4 py-3 shadow-sm">
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#a8a8aa]">
-                                      Stream starts
-                                    </p>
-                                    <p className="mt-2 text-sm font-semibold text-white">
-                                      {new Date(
-                                        stream?.startsAt ??
-                                        employee.startDate ??
-                                        employee.createdAt,
-                                      ).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  <div className="rounded-sm border border-white/10 bg-[#0a0a0a] px-4 py-3 shadow-sm">
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#a8a8aa]">
-                                      Rate / second
-                                    </p>
-                                    <p className="mt-2 font-mono text-sm font-semibold text-white">
-                                      {stream
-                                        ? `${stream.ratePerSecond.toFixed(8)} USDC/s`
-                                        : "Draft not created"}
-                                    </p>
-                                    {stream ? (
-                                      <p className="mt-1 text-[10px] text-[#a8a8aa]">
-                                        {payoutModeSummary(
-                                          stream.payoutMode ??
-                                          DEFAULT_PAYROLL_PAYOUT_MODE,
-                                        )}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                </div>
-                                {!focusedEmployeeId ? (
-                                  <div className="mt-3 flex flex-wrap gap-2">
-                                    <Link
-                                      href={`/people/${employee.id}`}
-                                      className="inline-flex items-center justify-center rounded-sm border border-white/10 bg-[#0a0a0a] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-white transition-all hover:border-white/30 no-underline"
-                                    >
-                                      Open employee page
-                                    </Link>
-                                    <Link
-                                      href="/people"
-                                      className="inline-flex items-center justify-center rounded-sm border border-white/10 bg-[#0a0a0a] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#a8a8aa] transition-all hover:border-white/30 hover:text-white no-underline"
-                                    >
-                                      People directory
-                                    </Link>
-                                  </div>
-                                ) : null}
+                          <div className="flex flex-col items-center justify-center px-6 py-12">
+                            {/* Hero Dashboard */}
+                            <div className="text-center mb-8">
+                              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#a8a8aa] mb-5 shadow-sm">
+                                {effectiveStatus === "active" ? (
+                                  <>
+                                    <span className="relative flex h-2 w-2">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    <span className="text-emerald-300">Live Streaming</span>
+                                  </>
+                                ) : effectiveStatus === "paused" ? (
+                                  <>
+                                    <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                                    <span className="text-amber-400">Paused</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="h-2 w-2 rounded-full bg-[#8f8f95]"></span>
+                                    <span>Not Active</span>
+                                  </>
+                                )}
                               </div>
+                              <h2 className="text-[3.5rem] font-black text-white tracking-tighter leading-none mb-3 font-mono">
+                                {preview ? formatMicroUsdc(preview.state.accruedUnpaidMicro) : "0.000000"}
+                              </h2>
+                              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#8f8f95]">
+                                Accrued USDC
+                              </p>
                             </div>
 
-                            <div>
-                              <div className="flex items-center gap-1.5 mb-2">
-                                <ShieldCheck
-                                  size={12}
-                                  className="text-emerald-300"
-                                />
-                                <label className="text-[10px] text-[#8f8f95] uppercase tracking-[0.2em] font-bold">
-                                  Private Payroll State
-                                </label>
+                            {/* Massive Media Controls */}
+                            <div className="flex items-center justify-center gap-6 mb-12">
+                              {/* Pause Button */}
+                              <button
+                                onClick={() => stream && handleControlStream(stream, "pause")}
+                                disabled={effectiveStatus !== "active" || controllingStream === stream?.id || closingStream === stream?.id}
+                                className={`flex h-16 w-16 items-center justify-center rounded-full transition-all duration-300 ${
+                                  effectiveStatus === "active" 
+                                    ? "bg-white/[0.05] text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 hover:scale-105 border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]" 
+                                    : "bg-[#0a0a0a] text-[#333] border border-white/5 cursor-not-allowed"
+                                }`}
+                                title="Pause Payroll"
+                              >
+                                {controllingStream === stream?.id && effectiveStatus === "active" ? <Loader2 size={24} className="animate-spin" /> : <Pause size={24} fill="currentColor" />}
+                              </button>
+
+                              {/* Play / Activate Button */}
+                              <button
+                                onClick={() =>
+                                  effectiveStatus === "stopped"
+                                    ? stream && handleRestartStoppedStream(stream)
+                                    : void handleGoLive(employee, stream, { isOnboarded, privateInitStatus })
+                                }
+                                disabled={
+                                  !walletAddress ||
+                                  savingStream === employee.id ||
+                                  restartingStream === stream?.id ||
+                                  closingStream === stream?.id ||
+                                  onboardingStream === stream?.id ||
+                                  controllingStream === stream?.id ||
+                                  (effectiveStatus === "stopped" && !isFullyClosed) ||
+                                  effectiveStatus === "active"
+                                }
+                                className={`flex h-24 w-24 items-center justify-center rounded-full transition-all duration-300 ${
+                                  effectiveStatus !== "active"
+                                    ? "bg-gradient-to-b from-emerald-400 to-emerald-600 text-black hover:scale-105 hover:shadow-[0_0_60px_rgba(16,185,129,0.3)] border border-emerald-300/50 shadow-[0_0_40px_rgba(16,185,129,0.15)]"
+                                    : "bg-[#0a0a0a] text-[#333] border border-white/5 cursor-not-allowed"
+                                }`}
+                                title="Activate / Resume Payroll"
+                              >
+                                {savingStream === employee.id || restartingStream === stream?.id || onboardingStream === stream?.id || (controllingStream === stream?.id && effectiveStatus !== "active") ? (
+                                  <Loader2 size={36} className="animate-spin text-black/50" />
+                                ) : (
+                                  <PlayCircle size={44} fill="currentColor" className="ml-1.5 opacity-90" />
+                                )}
+                              </button>
+
+                              {/* Stop Button */}
+                              <button
+                                onClick={() => stream && handleControlStream(stream, "stop")}
+                                disabled={!stream || effectiveStatus === "stopped" || controllingStream === stream?.id || closingStream === stream?.id}
+                                className={`flex h-16 w-16 items-center justify-center rounded-full transition-all duration-300 ${
+                                  stream && effectiveStatus !== "stopped"
+                                    ? "bg-white/[0.05] text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 hover:scale-105 border border-rose-500/20 shadow-[0_0_20px_rgba(244,63,94,0.1)]"
+                                    : "bg-[#0a0a0a] text-[#333] border border-white/5 cursor-not-allowed"
+                                }`}
+                                title="Stop Payroll"
+                              >
+                                {closingStream === stream?.id ? <Loader2 size={24} className="animate-spin" /> : <Square size={20} fill="currentColor" />}
+                              </button>
+                            </div>
+
+                            {/* Secondary Stats Grid */}
+                            <div className="grid w-full grid-cols-2 md:grid-cols-4 gap-3">
+                              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center hover:bg-white/[0.04] transition-colors">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-1">Rate / Sec</p>
+                                <p className="text-sm font-mono font-bold text-white">{stream ? stream.ratePerSecond.toFixed(8) : "0.0000"} USDC</p>
                               </div>
-                              {preview ? (
-                                <div className="rounded-sm bg-[#111111] border border-white/10 px-4 py-3 space-y-1.5 shadow-sm">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] text-[#a8a8aa] font-medium">
-                                      Accrued
-                                    </span>
-                                    <span className="font-mono text-xs text-emerald-300 font-bold">
-                                      {formatMicroUsdc(
-                                        preview.state.accruedUnpaidMicro,
-                                      )}{" "}
-                                      USDC
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] text-[#a8a8aa] font-medium">
-                                      Claimable now
-                                    </span>
-                                    <span className="font-mono text-xs text-white font-bold">
-                                      {formatMicroUsdc(
-                                        preview.state
-                                          .effectiveClaimableAmountMicro,
-                                      )}{" "}
-                                      USDC
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] text-[#a8a8aa] font-medium">
-                                      Last tee update
-                                    </span>
-                                    <span className="font-mono text-xs text-white font-bold">
-                                      {formatUnixTimestamp(
-                                        preview.state.lastAccrualTimestamp,
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] text-[#a8a8aa] font-medium">
-                                      Total paid
-                                    </span>
-                                    <span className="font-mono text-xs text-[#8f8f95]">
-                                      {formatMicroUsdc(
-                                        preview.state.totalPaidPrivateMicro,
-                                      )}{" "}
-                                      USDC
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] text-[#a8a8aa] font-medium">
-                                      Rate
-                                    </span>
-                                    <span className="font-mono text-[11px] text-[#8f8f95]">
-                                      {formatMicroUsdc(
-                                        preview.state.ratePerSecondMicro,
-                                      )}{" "}
-                                      USDC/s
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] text-[#a8a8aa] font-medium">
-                                      Snapshot fetched
-                                    </span>
-                                    <span className="font-mono text-[11px] text-[#8f8f95]">
-                                      {new Date(
-                                        preview.syncedAt,
-                                      ).toLocaleTimeString()}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] text-[#a8a8aa] font-medium">
-                                      Checkpoint sync
-                                    </span>
-                                    <span
-                                      className={`font-mono text-[11px] font-bold uppercase ${
-                                        observedCheckpointStatus === "active" &&
-                                        checkpointStateFresh
-                                          ? "text-emerald-300"
-                                          : observedCheckpointStatus === "stale"
-                                            ? "text-amber-300"
-                                          : observedCheckpointStatus === "failed"
-                                            ? "text-rose-300"
-                                            : "text-[#8f8f95]"
-                                      }`}
-                                    >
-                                      {observedCheckpointStatus === "active"
-                                        ? "ticking"
-                                        : observedCheckpointStatus ?? "idle"}
-                                    </span>
-                                  </div>
-                                  {observedCheckpointStatus === "stale" ? (
-                                    <p className="pt-2 text-[10px] text-amber-300">
-                                      Snapshot is refreshing, but the TEE accrual timestamp is not advancing.
-                                      The scheduler is registered, but the actual checkpoint worker looks
-                                      stalled. Use Restart Checkpoint Sync below.
-                                    </p>
-                                  ) : null}
-                                  {stream?.checkpointCrankUpdatedAt ? (
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[11px] text-[#a8a8aa] font-medium">
-                                        Sync updated
-                                      </span>
-                                      <span className="font-mono text-[11px] text-[#8f8f95]">
-                                        {new Date(
-                                          stream.checkpointCrankUpdatedAt,
-                                        ).toLocaleTimeString()}
-                                      </span>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              ) : hasMissingPrivateState ? (
-                                <div className="bg-red-500/10 border border-red-500/30 px-4 py-4 space-y-3">
-                                  <p className="text-[12px] text-red-300 font-bold">
-                                    ⚠ PER state missing
-                                  </p>
-                                  <p className="text-[11px] text-red-400 leading-relaxed">
-                                    This stream has no active private state in PER right now. Follow these steps to recover:
-                                  </p>
-                                  <ol className="text-[11px] text-red-300 font-medium space-y-1.5 list-decimal list-inside">
-                                    <li>
-                                      <strong>{effectiveStatus === "stopped" ? "Create Fresh Stream" : "Save Draft"}</strong>
-                                      {" "}
-                                      → {effectiveStatus === "stopped"
-                                        ? "creates a fresh paused replacement stream"
-                                        : "re-creates the stream draft"}
-                                    </li>
-                                    <li><strong>Onboard PER</strong> → re-initializes private state</li>
-                                    <li><strong>Resume</strong> → activates the stream again</li>
-                                  </ol>
-                                </div>
-                              ) : (
-                                <div className="bg-[#111111] border border-white/15 px-4 py-4 space-y-2">
-                                  {isOnboarded ? (
-                                    <>
-                                      <p className="text-[12px] text-[#d0d0d4] font-bold">
-                                        State not loaded
-                                      </p>
-                                      <p className="text-[11px] text-[#a8a8aa] leading-relaxed">
-                                        Click <strong>Refresh State</strong> below to load the current payroll data.
-                                      </p>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <p className="text-[12px] text-[#d0d0d4] font-bold">
-                                        Not onboarded yet
-                                      </p>
-                                      <ol className="text-[11px] text-[#b6b6bc] font-medium space-y-1.5 list-decimal list-inside">
-                                        <li><strong>Save Draft</strong> → creates the stream on-chain</li>
-                                        <li><strong>Onboard PER</strong> → enables private payroll</li>
-                                        <li><strong>Refresh State</strong> → loads the data here</li>
-                                      </ol>
-                                    </>
-                                  )}
-                                </div>
-                              )}
+                              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center hover:bg-white/[0.04] transition-colors">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-1">Monthly Salary</p>
+                                <p className="text-sm font-bold text-emerald-300">{formatUsd(employee.monthlySalaryUsd ?? ratePerSecondToMonthlyUsd(stream?.ratePerSecond ?? 0))}</p>
+                              </div>
+                              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center hover:bg-white/[0.04] transition-colors">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-1">Total Paid</p>
+                                <p className="text-sm font-mono font-bold text-white">{preview ? formatMicroUsdc(preview.state.totalPaidPrivateMicro) : "0.000000"} USDC</p>
+                              </div>
+                              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center hover:bg-white/[0.04] transition-colors">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-1">Claimable Now</p>
+                                <p className="text-sm font-mono font-bold text-white">{preview ? formatMicroUsdc(preview.state.effectiveClaimableAmountMicro) : "0.000000"} USDC</p>
+                              </div>
                             </div>
                           </div>
 
@@ -3991,94 +3894,14 @@ function EmployerPageContent() {
                             </>
                           ) : null}
 
-                          <div className="h-px bg-[#111111] mx-5" />
+                          <div className="mx-6 h-px bg-white/5" />
 
-                          <div className="flex flex-wrap items-center gap-2 px-5 py-4">
-                            {effectiveStatus !== "stopped" ? (
-                              <button
-                                onClick={() =>
-                                  void handleGoLive(employee, stream, {
-                                    isOnboarded,
-                                    privateInitStatus,
-                                  })
-                                }
-                                disabled={
-                                  !walletAddress ||
-                                  savingStream === employee.id ||
-                                  restartingStream === stream?.id ||
-                                  closingStream === stream?.id ||
-                                  onboardingStream === stream?.id ||
-                                  controllingStream === stream?.id ||
-                                  effectiveStatus === "active"
-                                }
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-bold transition-all disabled:opacity-50 uppercase tracking-wider shadow-sm"
-                              >
-                                {savingStream === employee.id ||
-                                restartingStream === stream?.id ||
-                                closingStream === stream?.id ||
-                                onboardingStream === stream?.id ||
-                                controllingStream === stream?.id ? (
-                                  <Loader2 size={13} className="animate-spin" />
-                                ) : (
-                                  <PlayCircle size={13} />
-                                )}
-                                {effectiveStatus === "active" ? "Live" : "Go Live"}
-                              </button>
-                            ) : null}
-
-                            <button
-                              onClick={() =>
-                                effectiveStatus === "stopped"
-                                  ? stream &&
-                                  handleRestartStoppedStream(stream)
-                                  : handleSaveDraftStream(employee)
-                              }
-                              disabled={
-                                !walletAddress ||
-                                savingStream === employee.id ||
-                                restartingStream === stream?.id ||
-                                closingStream === stream?.id ||
-                                (effectiveStatus === "stopped" && !isFullyClosed)
-                              }
-                              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-sm text-[11px] font-bold transition-all disabled:opacity-50 uppercase tracking-wider border ${
-                                effectiveStatus === "stopped"
-                                  ? isFullyClosed
-                                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20"
-                                    : "bg-[#0f0f10] border-white/10 text-[#7b7b82]"
-                                  : "bg-[#0f0f10] border-white/10 text-white hover:bg-black"
-                              }`}
-                            >
-                              {savingStream === employee.id ||
-                                restartingStream === stream?.id ||
-                                closingStream === stream?.id ? (
-                                <Loader2 size={13} className="animate-spin" />
-                              ) : effectiveStatus === "stopped" ? (
-                                <RotateCcw size={13} />
-                              ) : (
-                                <Save size={13} />
-                              )}
-                              {effectiveStatus === "stopped"
-                                ? "Create Fresh Stream"
-                                : stream
-                                  ? "Save Draft"
-                                  : "Create Draft"}
-                            </button>
-
-                            <Link
-                              href={`/people/${employee.id}`}
-                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#0a0a0a] border border-white/15 text-[#b6b6bc] hover:text-white hover:border-white/30 text-[11px] font-bold transition-all uppercase tracking-wider no-underline"
-                            >
-                              <Users size={13} />
-                              Open Profile
-                            </Link>
-
-                            <div className="w-px h-5 bg-neutral-300" />
-
+                          <div className="flex flex-wrap items-center gap-3 px-6 py-5">
                             {stream && streamsNeedingRecovery[stream.id] ? (
                               <button
                                 onClick={() => handleSyncPayrollState(stream, streamsNeedingRecovery[stream.id])}
                                 disabled={settlingTickStream === stream.id || !walletAddress}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-amber-500/10 border border-amber-500/30 text-amber-500 hover:bg-amber-500/20 text-[11px] font-bold transition-all shadow-sm uppercase tracking-wider disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-amber-400 transition-all hover:bg-amber-500/20 shadow-sm disabled:opacity-60"
                               >
                                 {settlingTickStream === stream.id ? (
                                   <Loader2 size={13} className="animate-spin" />
@@ -4089,7 +3912,7 @@ function EmployerPageContent() {
                               </button>
                             ) : stream && (effectiveStatus !== "stopped" || mustSettleBeforeClose) && (
                               <>
-                                <div className="inline-flex items-center gap-2 rounded-sm border border-white/15 bg-[#0a0a0a] px-4 py-2">
+                                <div className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-[#0a0a0a] px-4 py-2.5">
                                   <input
                                     type="number"
                                     inputMode="decimal"
@@ -4142,7 +3965,7 @@ function EmployerPageContent() {
                                       }));
                                     }}
                                     disabled={!preview || hasMissingPrivateState}
-                                    className="inline-flex min-h-8 items-center justify-center rounded-sm px-2 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300 transition-colors hover:text-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="inline-flex min-h-8 items-center justify-center rounded-xl px-2 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300 transition-colors hover:text-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
                                   >
                                     Max
                                   </button>
@@ -4206,7 +4029,7 @@ function EmployerPageContent() {
                                     (effectiveStatus !== "active" &&
                                       effectiveStatus !== "stopped")
                                   }
-                                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-sm border text-[11px] font-bold transition-all disabled:opacity-60 shadow-sm uppercase tracking-wider ${
+                                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-60 shadow-sm ${
                                     effectiveStatus === "stopped"
                                       ? "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
                                       : "bg-[#0f0f10] border-white/10 text-white hover:bg-black"
@@ -4255,7 +4078,7 @@ function EmployerPageContent() {
                                   isOnboarded ||
                                   !stream
                                 }
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#0f0f10] border border-white/10 text-white hover:bg-black text-[11px] font-bold transition-all disabled:opacity-60 shadow-sm uppercase tracking-wider"
+                                className="inline-flex items-center gap-1.5 rounded-2xl border border-white/10 bg-[#0f0f10] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white transition-all hover:bg-black disabled:opacity-60 shadow-sm"
                               >
                                 {onboardingStream === stream?.id ? (
                                   <Loader2 size={13} className="animate-spin" />
@@ -4265,7 +4088,7 @@ function EmployerPageContent() {
                                 {isOnboarded ? "PER Onboarded" : "Onboard PER"}
                               </button>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#0f0f10] border border-white/10 text-white text-[11px] font-bold uppercase tracking-wider shadow-sm">
+                              <span className="inline-flex items-center gap-1.5 rounded-2xl border border-white/10 bg-[#0f0f10] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm">
                                 <Sparkles size={13} />
                                 PER Onboarded
                               </span>
@@ -4273,199 +4096,97 @@ function EmployerPageContent() {
 
 
 
-                            {effectiveStatus === "paused" ? (
-                              <button
-                                onClick={() =>
-                                  stream &&
-                                  handleControlStream(stream, "resume")
-                                }
-                                disabled={
-                                  !walletAddress ||
-                                  controllingStream === stream?.id ||
-                                  !stream ||
-                                  !isOnboarded ||
-                                  !isRecipientPrivateReady
-                                }
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#0a0a0a] border border-white/15 text-emerald-300 hover:bg-emerald-500/10 text-[11px] font-bold transition-all disabled:opacity-60 uppercase tracking-wider shadow-sm"
-                              >
-                                {controllingStream === stream?.id ? (
-                                  <Loader2 size={13} className="animate-spin" />
-                                ) : (
-                                  <PlayCircle size={13} />
-                                )}
-                                Resume
-                              </button>
-                            ) : null}
+                            {/* Advanced Engine Controls */}
+                            <div className="mt-8 px-6 pb-6">
+                              <details className="group">
+                                <summary className="flex cursor-pointer items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#8f8f95] transition-colors hover:text-white list-none">
+                                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5 transition-transform group-open:rotate-90">
+                                    <ChevronLeft size={12} className="rotate-180" />
+                                  </span>
+                                  Advanced Engine Controls
+                                </summary>
+                                
+                                <div className="mt-4 rounded-2xl border border-white/5 bg-[#050505] p-5 shadow-inner">
+                                  <div className="flex flex-wrap items-center gap-3">
+                                    {stream && streamsNeedingRecovery[stream.id] ? (
+                                      <button
+                                        onClick={() => handleSyncPayrollState(stream, streamsNeedingRecovery[stream.id])}
+                                        disabled={settlingTickStream === stream.id || !walletAddress}
+                                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-amber-400 transition-all hover:bg-amber-500/20 shadow-sm disabled:opacity-60"
+                                      >
+                                        {settlingTickStream === stream.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                                        Sync Payroll State
+                                      </button>
+                                    ) : null}
 
-                            {effectiveStatus === "active" ? (
-                              <button
-                                onClick={() =>
-                                  stream && handleControlStream(stream, "pause")
-                                }
-                                disabled={
-                                  !walletAddress ||
-                                  controllingStream === stream?.id ||
-                                  !stream ||
-                                  !isOnboarded
-                                }
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#0a0a0a] border border-white/15 text-[#b6b6bc] hover:text-white hover:border-white/30 text-[11px] font-bold transition-all disabled:opacity-60 uppercase tracking-wider shadow-sm"
-                              >
-                                <Pause size={13} />
-                                Pause
-                              </button>
-                            ) : null}
+                                    {canShowCheckpointControl ? (
+                                      <button
+                                        onClick={() => {
+                                          const observedCheckpointStatus = deriveObservedCheckpointCrankStatus({
+                                            currentStatus: stream!.checkpointCrankStatus,
+                                            lastAccrualTimestamp: privateStates[stream!.id]?.state.lastAccrualTimestamp,
+                                            nowMs,
+                                          });
 
-                            {!isFullyClosed ? (
-                              <button
-                                onClick={() =>
-                                  stream && void handleCloseStream(stream)
-                                }
-                                disabled={
-                                  !walletAddress ||
-                                  closingStream === stream?.id ||
-                                  controllingStream === stream?.id ||
-                                  restartingStream === stream?.id ||
-                                  !stream ||
-                                  !isOnboarded ||
-                                  mustSettleBeforeClose
-                                }
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#0a0a0a] border border-white/15 text-red-400 hover:bg-red-500/10 text-[11px] font-bold transition-all disabled:opacity-60 uppercase tracking-wider shadow-sm"
-                              >
-                                {closingStream === stream?.id ? (
-                                  <Loader2 size={13} className="animate-spin" />
-                                ) : (
-                                  <Square size={13} />
-                                )}
-                                {closingStream === stream?.id
-                                  ? "Closing..."
-                                  : "Close Stream"}
-                              </button>
-                            ) : null}
+                                          if (observedCheckpointStatus === "stale") {
+                                            void handleRestartCheckpointCrank(stream!);
+                                            return;
+                                          }
+                                          void handleCheckpointCrank(
+                                            stream!,
+                                            stream!.checkpointCrankStatus === "active" ? "cancel" : "schedule",
+                                          );
+                                        }}
+                                        disabled={!walletAddress || checkpointingStream === stream?.id || !isOnboarded || (effectiveStatus !== "active" && stream?.checkpointCrankStatus !== "active")}
+                                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[#b6b6bc] transition-all hover:bg-white/10 hover:text-white disabled:opacity-60"
+                                      >
+                                        {checkpointingStream === stream?.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                        {stream && deriveObservedCheckpointCrankStatus({
+                                          currentStatus: stream.checkpointCrankStatus,
+                                          lastAccrualTimestamp: privateStates[stream.id]?.state.lastAccrualTimestamp,
+                                          nowMs,
+                                        }) === "stale"
+                                          ? effectiveStatus === "active" ? "Restart Sync" : "Stop Sync"
+                                          : stream?.checkpointCrankStatus === "active" ? "Stop Sync" : "Start Sync"}
+                                      </button>
+                                    ) : null}
 
+                                    {stream && (
+                                      <button
+                                        onClick={() => fetchPrivatePreview(stream)}
+                                        disabled={!walletAddress || refreshingPreview === stream.id || !isOnboarded}
+                                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[#b6b6bc] transition-all hover:bg-white/10 hover:text-white disabled:opacity-60"
+                                      >
+                                        {refreshingPreview === stream.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                        Refresh TEE State
+                                      </button>
+                                    )}
 
-                            {effectiveStatus === "stopped" ? (
-                              <p className="w-full text-[10px] text-[#8f8f95] font-medium">
-                                {isFullyClosed
-                                  ? "This stream is fully closed. Create a fresh stream when you want this employee to go live again."
-                                  : mustSettleBeforeClose
-                                    ? "This stream is stopped, but not ready to close yet. Settle the remaining payroll first, then close the stream."
-                                    : "Remaining payroll is fully settled. Close this stream to finish PER/base cleanup."}
-                              </p>
-                            ) : isOnboarded && !isRecipientPrivateReady ? (
-                              <p className="w-full text-[10px] text-[#8f8f95] font-medium">
-                                {privateInitStatus === "failed"
-                                  ? "Employee private recipient setup failed. Ask them to open Claim > Withdraw and initialize again before resuming payroll."
-                                  : "Employee must initialize their private recipient before this stream can go live."}
-                              </p>
-                            ) : effectiveStatus === "paused" ? (
-                              <p className="w-full text-[10px] text-[#8f8f95] font-medium">
-                                Paused streams do not accrue or settle new payroll. Resume first to continue live accrual or settle more salary.
-                              </p>
-                            ) : null}
+                                    {!isFullyClosed && effectiveStatus === "stopped" ? (
+                                      <button
+                                        onClick={() => stream && void handleCloseStream(stream)}
+                                        disabled={!walletAddress || closingStream === stream?.id || controllingStream === stream?.id || restartingStream === stream?.id || !stream || !isOnboarded || mustSettleBeforeClose}
+                                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-red-400 transition-all hover:bg-red-500/20 disabled:opacity-60"
+                                      >
+                                        {closingStream === stream?.id ? <Loader2 size={12} className="animate-spin" /> : <Square size={12} />}
+                                        {closingStream === stream?.id ? "Closing..." : "Close Stream"}
+                                      </button>
+                                    ) : null}
+                                  </div>
 
-                            <p className="w-full text-[10px] text-[#8f8f95] font-medium">
-                              {effectiveStatus === "stopped"
-                                ? "Close readiness: "
-                                : "Go Live readiness: "}
-                              <span className="font-bold uppercase text-white">
-                                {goLiveReadiness.label}
-                              </span>
-                              {" · "}
-                              {goLiveReadiness.copy}
-                            </p>
-
-                            {effectiveStatus === "stopped" &&
-                            !isFullyClosed &&
-                            !mustSettleBeforeClose ? (
-                              <p className="w-full text-[10px] text-emerald-300 font-medium">
-                                Remaining payroll is cleared. The only step left is to close this stream.
-                              </p>
-                            ) : null}
-
-                            {closingStream === stream?.id && closeProgress ? (
-                              <p className="w-full text-[10px] text-amber-300 font-medium">
-                                Close progress: {closeProgress}
-                              </p>
-                            ) : null}
-
-                            {canShowCheckpointControl ? (
-                              <button
-                                onClick={() => {
-                                  const observedCheckpointStatus =
-                                    deriveObservedCheckpointCrankStatus({
-                                      currentStatus: stream.checkpointCrankStatus,
-                                      lastAccrualTimestamp:
-                                        privateStates[stream.id]?.state
-                                          .lastAccrualTimestamp,
-                                      nowMs,
-                                    });
-
-                                  if (observedCheckpointStatus === "stale") {
-                                    void handleRestartCheckpointCrank(stream);
-                                    return;
-                                  }
-
-                                  void handleCheckpointCrank(
-                                    stream,
-                                    stream.checkpointCrankStatus === "active"
-                                      ? "cancel"
-                                      : "schedule",
-                                  );
-                                }}
-                                disabled={
-                                  !walletAddress ||
-                                  checkpointingStream === stream.id ||
-                                  !isOnboarded ||
-                                  (effectiveStatus !== "active" &&
-                                    stream.checkpointCrankStatus !== "active")
-                                }
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#0a0a0a] border border-white/15 text-[#b6b6bc] hover:text-white hover:border-white/30 text-[11px] font-bold transition-all disabled:opacity-60 uppercase tracking-wider shadow-sm"
-                              >
-                                {checkpointingStream === stream.id ? (
-                                  <Loader2
-                                    size={13}
-                                    className="animate-spin"
-                                  />
-                                ) : (
-                                  <RefreshCw size={13} />
-                                )}
-                                {deriveObservedCheckpointCrankStatus({
-                                  currentStatus: stream.checkpointCrankStatus,
-                                  lastAccrualTimestamp:
-                                    privateStates[stream.id]?.state
-                                      .lastAccrualTimestamp,
-                                  nowMs,
-                                }) === "stale"
-                                  ? effectiveStatus === "active"
-                                    ? "Restart Checkpoint Sync"
-                                    : "Stop Checkpoint Sync"
-                                  : stream.checkpointCrankStatus === "active"
-                                    ? "Stop Checkpoint Sync"
-                                    : "Start Checkpoint Sync"}
-                              </button>
-                            ) : null}
-
-                            {stream && (
-                              <button
-                                onClick={() => fetchPrivatePreview(stream)}
-                                disabled={
-                                  !walletAddress ||
-                                  refreshingPreview === stream.id ||
-                                  !isOnboarded
-                                }
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-sm bg-[#0a0a0a] border border-white/15 text-[#b6b6bc] hover:text-white hover:border-white/30 text-[11px] font-bold transition-all disabled:opacity-60 uppercase tracking-wider shadow-sm"
-                              >
-                                {refreshingPreview === stream.id ? (
-                                  <Loader2
-                                    size={13}
-                                    className="animate-spin"
-                                  />
-                                ) : (
-                                  <RefreshCw size={13} />
-                                )}
-                                Refresh State
-                              </button>
-                            )}
+                                  {effectiveStatus === "stopped" && !isFullyClosed && mustSettleBeforeClose && (
+                                    <p className="mt-3 text-[10px] text-amber-400/80">
+                                      * You must manually settle the remaining payroll above before this stream can be closed.
+                                    </p>
+                                  )}
+                                  {closingStream === stream?.id && closeProgress ? (
+                                    <p className="mt-3 text-[10px] font-medium text-amber-300">
+                                      Close progress: {closeProgress}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </details>
+                            </div>
                           </div>
                         </div>
                       );

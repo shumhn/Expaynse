@@ -46,6 +46,7 @@ import {
   useGuideStatus,
   useGuideTargetReady,
 } from "@/components/ui/interactive-guide";
+import { DateRangeCalendarPicker } from "@/components/date-range-calendar-picker";
 
 const PEOPLE_ONBOARDING_HANDOFF_KEY = "expaynse:people-onboarding-handoff";
 
@@ -297,6 +298,8 @@ export default function PeoplePage() {
   const [newPayoutMode, setNewPayoutMode] = useState<PayrollPayoutMode>(
     DEFAULT_PAYROLL_PAYOUT_MODE,
   );
+  const [newStartDate, setNewStartDate] = useState("");
+  const [newEndDate, setNewEndDate] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [privateStates, setPrivateStates] = useState<
     Record<string, PrivatePayrollStateResponse>
@@ -803,7 +806,9 @@ export default function PeoplePage() {
         return;
       }
 
-      const startDateTimeIso = new Date().toISOString();
+      const startDateTimeIso = newStartDate 
+        ? new Date(newStartDate).toISOString() 
+        : new Date().toISOString();
 
       // Persist streaming mode first so downstream flows (stream creation, UI state)
       // use a single canonical payroll mode.
@@ -882,6 +887,11 @@ export default function PeoplePage() {
       return;
     }
     setAdding(true);
+    
+    const startDateTimeIso = newStartDate 
+      ? new Date(newStartDate).toISOString() 
+      : new Date().toISOString();
+      
     try {
       const employeeRes = await walletAuthenticatedFetch({
         wallet: walletAddr,
@@ -1569,9 +1579,12 @@ export default function PeoplePage() {
                   <label className="text-[11px] font-bold text-[#8f8f95] uppercase tracking-wider mb-1.5 block">
                     Stream starts at
                   </label>
-                  <div className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white/50 cursor-not-allowed">
-                    Immediately upon onboarding
-                  </div>
+                  <DateRangeCalendarPicker
+                    startDate={newStartDate}
+                    endDate={newEndDate}
+                    onStartChange={setNewStartDate}
+                    onEndChange={setNewEndDate}
+                  />
                 </div>
               )}
             </div>
