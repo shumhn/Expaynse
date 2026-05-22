@@ -14,6 +14,7 @@ import {
 import Link from "next/link";
 import { EmployeeLayout } from "@/components/employee-layout";
 import { useClaimData } from "@/components/claim/use-claim-data";
+import { formatDisplayedUsdcBalance } from "@/components/claim/claim-helpers";
 import { 
   formatMicroUsdc,
   formatPayrollRate,
@@ -339,7 +340,9 @@ export default function ClaimBalancesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="rounded-2xl border border-white/10 bg-[#0b0b0d] p-6">
                 <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-[#8f8f95]">PER Private Balance</p>
-                <p className="text-xl font-bold text-white">{privBalance ?? "0.00"}</p>
+                <p className="text-xl font-bold text-white">
+                  {privBalance ? formatDisplayedUsdcBalance(parseFloat(privBalance)) : "0.00"}
+                </p>
                 <p className="mt-1 text-[10px] font-bold text-[#62626b]">USDC</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#0b0b0d] p-6">
