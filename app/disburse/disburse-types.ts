@@ -38,6 +38,7 @@ export interface PayrollStream {
   employeeId: string;
   ratePerSecond: number;
   startsAt?: string | null;
+  endsAt?: string | null;
   payoutMode?: PayrollPayoutMode;
   allowedPayoutModes?: PayrollPayoutMode[];
   employeePda?: string;
@@ -52,6 +53,16 @@ export interface PayrollStream {
   lastPaidAt: string | null;
   totalPaid: number;
   status: StreamStatus;
+  compensationSnapshot?: {
+    employmentType?: "full_time" | "part_time" | "contract";
+    paySchedule?: PaySchedule;
+    compensationUnit?: "monthly" | "weekly" | "hourly";
+    compensationAmountUsd?: number;
+    weeklyHours?: number;
+    monthlySalaryUsd?: number;
+    startsAt?: string | null;
+    endsAt?: string | null;
+  };
   createdAt: string;
   updatedAt: string;
 }

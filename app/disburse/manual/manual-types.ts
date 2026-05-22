@@ -39,13 +39,16 @@ export interface PayrollHistoryRun {
   id: string;
   date: string;
   mode?: "streaming" | "private_payroll";
+  payPeriod?: string;
   totalAmount: number;
   employeeCount: number;
   employeeIds?: string[];
   employeeNames?: string[];
+  employeeAmounts?: number[];
   recipientAddresses: string[];
   depositSig?: string;
   transferSig?: string;
+  transferSigs?: string[];
   status: "success" | "failed";
 }
 
