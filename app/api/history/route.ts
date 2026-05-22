@@ -9,6 +9,8 @@ import {
   savePayrollRun,
   saveSetupAction,
   updateSetupActionStatus,
+  listEmployeePayrollRuns,
+  listClaimRecords,
 } from "@/lib/server/history-store";
 import { saveComplianceEvent } from "@/lib/server/compliance-store";
 import {
@@ -140,6 +142,19 @@ export async function GET(request: NextRequest) {
   try {
     const wallet = getWalletFromRequest(request);
     await requireWalletAuthorization({ request, wallet });
+    const scope = request.nextUrl.searchParams.get("scope");
+    
+    if (scope === "employee") {
+      const payrollRuns = await listEmployeePayrollRuns(wallet);
+      const claimRecords = await listClaimRecords(wallet);
+      return NextResponse.json({
+        wallet,
+        payrollRuns,
+        setupActions: [],
+        claimRecords,
+      });
+    }
+
     const history = await getWalletActivityHistory(wallet);
 
     const failedSetupActions = history.setupActions.filter(
@@ -198,13 +213,16 @@ export async function POST(request: NextRequest) {
           kind?: "payroll-run";
           wallet?: string;
           mode?: "streaming" | "private_payroll";
+          payPeriod?: string;
           totalAmount?: number;
           employeeCount?: number;
           employeeIds?: string[];
           employeeNames?: string[];
+          employeeAmounts?: number[];
           recipientAddresses?: string[];
           depositSig?: string;
           transferSig?: string;
+          transferSigs?: string[];
           status?: "success" | "failed";
           privacyConfig?: unknown;
           providerMeta?: unknown;
@@ -263,6 +281,10 @@ export async function POST(request: NextRequest) {
         const payrollRun = await savePayrollRun({
           wallet: body.wallet,
           mode: body.mode === "private_payroll" ? "private_payroll" : "streaming",
+          payPeriod:
+            typeof body.payPeriod === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(body.payPeriod)
+              ? body.payPeriod
+              : undefined,
           totalAmount: body.totalAmount,
           employeeCount: body.employeeCount,
           employeeIds: Array.isArray(body.employeeIds)
@@ -277,9 +299,21 @@ export async function POST(request: NextRequest) {
                   typeof value === "string" && value.trim().length > 0,
               )
             : undefined,
+          employeeAmounts: Array.isArray(body.employeeAmounts)
+            ? body.employeeAmounts.filter(
+                (value): value is number =>
+                  typeof value === "number" && Number.isFinite(value) && value >= 0,
+              )
+            : undefined,
           recipientAddresses: body.recipientAddresses,
           depositSig: body.depositSig,
           transferSig: body.transferSig,
+          transferSigs: Array.isArray(body.transferSigs)
+            ? body.transferSigs.filter(
+                (value): value is string =>
+                  typeof value === "string" && value.trim().length > 0,
+              )
+            : undefined,
           status: body.status,
           privacyConfig: normalizePrivacyConfig(body.privacyConfig),
           providerMeta: normalizeProviderMeta(body.providerMeta),
