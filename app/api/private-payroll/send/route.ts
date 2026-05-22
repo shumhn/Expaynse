@@ -16,6 +16,7 @@ const TEE_URL =
 
 type SendPrivatePayrollBody = {
   employerWallet?: string;
+  payPeriod?: string;
   recipients?: Array<{
     employeeId?: string;
     name?: string;
@@ -32,9 +33,19 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const body = JSON.parse(rawBody || "{}") as SendPrivatePayrollBody;
   const employerWallet = body.employerWallet?.trim();
+  const payPeriodRaw = body.payPeriod?.trim();
 
   if (!employerWallet) {
     return badRequest("employerWallet is required");
+  }
+
+  const now = new Date();
+  const defaultPayPeriod = `${now.getFullYear()}-${String(
+    now.getMonth() + 1,
+  ).padStart(2, "0")}`;
+  const payPeriod = payPeriodRaw || defaultPayPeriod;
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(payPeriod)) {
+    return badRequest("payPeriod must be YYYY-MM");
   }
 
   const recipients = Array.isArray(body.recipients)
@@ -138,6 +149,7 @@ export async function POST(request: NextRequest) {
   const payrollRun = await savePayrollRun({
     wallet: employerWallet,
     mode: "private_payroll",
+    payPeriod,
     totalAmount: totalAmountMicro / 1_000_000,
     employeeCount: recipients.length,
     employeeIds: recipients
@@ -146,8 +158,10 @@ export async function POST(request: NextRequest) {
     employeeNames: recipients
       .map((recipient) => recipient.name)
       .filter((value): value is string => Boolean(value)),
+    employeeAmounts: recipients.map((recipient) => recipient.amount),
     recipientAddresses: recipients.map((recipient) => recipient.address),
     transferSig: transferResults[0]?.signature,
+    transferSigs: transferResults.map((transfer) => transfer.signature ?? ""),
     status: "success",
     privacyConfig: {
       visibility: "private",
@@ -158,6 +172,11 @@ export async function POST(request: NextRequest) {
       provider: "magicblock",
       action: "employee-private-transfer",
       sendTo: transferResults[0]?.sendTo,
+      transferProofs: transferResults.map((transfer) => ({
+        address: transfer.address,
+        signature: transfer.signature ?? "",
+        amount: transfer.amount,
+      })),
     },
   });
 
