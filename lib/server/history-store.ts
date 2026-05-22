@@ -20,6 +20,11 @@ export interface ProviderMetaRecord {
   destinationWallet?: string;
   creditVerified?: boolean;
   errorMessage?: string;
+  transferProofs?: Array<{
+    address: string;
+    signature: string;
+    amount: number;
+  }>;
 }
 
 export interface PayrollRun {
@@ -27,13 +32,16 @@ export interface PayrollRun {
   date: string;
   wallet: string;
   mode?: "streaming" | "private_payroll";
+  payPeriod?: string;
   totalAmount: number;
   employeeCount: number;
   employeeIds?: string[];
   employeeNames?: string[];
+  employeeAmounts?: number[];
   recipientAddresses: string[];
   depositSig?: string;
   transferSig?: string;
+  transferSigs?: string[];
   status: "success" | "failed";
   privacyConfig?: PrivacyConfigRecord;
   providerMeta?: ProviderMetaRecord;
@@ -156,6 +164,14 @@ export async function getWalletActivityHistory(wallet: string) {
     setupActions,
     claimRecords,
   };
+}
+
+export async function listEmployeePayrollRuns(recipientWallet: string) {
+  const normalizedWallet = assertWallet(recipientWallet);
+  return (await payrollRunsCollection())
+    .find({ recipientAddresses: normalizedWallet })
+    .sort({ date: -1 })
+    .toArray();
 }
 
 export async function savePayrollRun(

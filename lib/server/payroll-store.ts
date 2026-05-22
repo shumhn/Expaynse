@@ -41,6 +41,14 @@ export interface EmployeeRecord {
   privateRecipientInitConfirmedAt?: string | null;
   privateRecipientInitTxSignature?: string | null;
   privateRecipientInitError?: string | null;
+  nextCyclePlan?: {
+    monthlySalaryUsd: number;
+    startsAt: string;
+    endsAt: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,6 +59,7 @@ export interface PayrollStreamRecord {
   employeeId: string;
   ratePerSecond: number;
   startsAt?: string | null;
+  endsAt?: string | null;
   payoutMode?: PayrollPayoutMode;
   allowedPayoutModes?: PayrollPayoutMode[];
   employeePda?: string;
@@ -81,6 +90,7 @@ export interface PayrollStreamRecord {
     weeklyHours?: number;
     monthlySalaryUsd?: number;
     startsAt?: string | null;
+    endsAt?: string | null;
   };
   createdAt: string;
   updatedAt: string;
@@ -222,6 +232,7 @@ export interface CreateStreamInput {
   employeeId: string;
   ratePerSecond: number;
   startsAt?: string | null;
+  endsAt?: string | null;
   payoutMode?: PayrollPayoutMode;
   allowedPayoutModes?: PayrollPayoutMode[];
   employeePda?: string;
@@ -238,6 +249,7 @@ export interface CreateStreamInput {
     weeklyHours?: number;
     monthlySalaryUsd?: number;
     startsAt?: string | null;
+    endsAt?: string | null;
   };
 }
 
@@ -752,6 +764,7 @@ export async function createStream(input: CreateStreamInput) {
     employeeId: input.employeeId,
     ratePerSecond,
     startsAt: normalizedStartsAt,
+    endsAt: input.endsAt ?? null,
     payoutMode,
     allowedPayoutModes,
     employeePda: input.employeePda,
@@ -775,6 +788,7 @@ export async function createStream(input: CreateStreamInput) {
           weeklyHours: input.compensationSnapshot.weeklyHours,
           monthlySalaryUsd: input.compensationSnapshot.monthlySalaryUsd,
           startsAt: input.compensationSnapshot.startsAt ?? normalizedStartsAt,
+          endsAt: input.compensationSnapshot.endsAt ?? null,
         }
       : undefined,
     createdAt: timestamp,
