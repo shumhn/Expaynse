@@ -1,7 +1,10 @@
 export function formatDisplayedUsdcBalance(value: number) {
   if (!Number.isFinite(value) || value <= 0) return "0.00";
-  if (value >= 0.01) return value.toFixed(2);
-  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  const str = value.toFixed(6).replace(/0+$/, "");
+  if (str.endsWith(".")) return str + "00";
+  const decimals = str.split(".")[1];
+  if (decimals && decimals.length === 1) return str + "0";
+  return str;
 }
 
 export function getClaimErrorMessage(error: unknown) {
