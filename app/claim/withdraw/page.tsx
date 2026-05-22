@@ -10,7 +10,7 @@ import {
   Send,
   AlertTriangle,
   CheckCircle2,
-  Clock3,
+  X,
   ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
@@ -24,7 +24,6 @@ import {
 } from "@/components/claim/claim-helpers";
 import type {
   ClaimCashoutRequest,
-  ClaimWithdrawHistoryRecord,
   OnChainPendingClaim,
 } from "@/components/claim/claim-types";
 import { toast } from "sonner";
@@ -64,10 +63,14 @@ export default function ClaimWithdrawPage() {
   const [requestAmount, setRequestAmount] = useState<string>("");
   const [submittingRequest, setSubmittingRequest] = useState<boolean>(false);
   const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
-  const [loadingWithdrawHistory, setLoadingWithdrawHistory] = useState<boolean>(false);
   const [cashoutRequests, setCashoutRequests] = useState<ClaimCashoutRequest[]>([]);
-  const [withdrawHistory, setWithdrawHistory] = useState<ClaimWithdrawHistoryRecord[]>([]);
   const [onChainPendingClaim, setOnChainPendingClaim] = useState<OnChainPendingClaim | null>(null);
+  const [successModal, setSuccessModal] = useState<{
+    type: "claim" | "withdraw";
+    amount: number;
+    txSig?: string;
+    recipient?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (publicKey) {
@@ -150,15 +153,25 @@ export default function ClaimWithdrawPage() {
         const response = await walletAuthenticatedFetch({
           wallet: publicKey.toBase58(),
           signMessage,
-          path: `/api/cashout-requests?scope=employee&employeeWallet=${publicKey.toBase58()}`,
+          path: `/api/history?scope=employee`,
         });
         const json = (await response.json()) as {
-          requests?: ClaimCashoutRequest[];
+          claimRecords?: any[];
           error?: string;
         };
         if (!response.ok)
           throw new Error(json.error || "Failed to load requests");
-        setCashoutRequests(json.requests ?? []);
+        
+        const historyRecords = json.claimRecords || [];
+        const mappedRequests = historyRecords.map((record) => ({
+          id: record.id,
+          requestedAmount: record.amount,
+          createdAt: record.date,
+          payoutMode: record.providerMeta?.action === "claim" ? "Claim" : "Withdrawal",
+          status: record.status === "success" ? "fulfilled" : record.status === "failed" ? "dismissed" : "pending"
+        }));
+        
+        setCashoutRequests(mappedRequests as ClaimCashoutRequest[]);
 
         if (primaryStreamId) {
           const claimRes = await fetch(`/api/claim-salary/request?streamId=${primaryStreamId}`);
@@ -178,63 +191,6 @@ export default function ClaimWithdrawPage() {
     [publicKey, signMessage, primaryStreamId],
   );
 
-  const fetchWithdrawHistory = useCallback(
-    async (silent = true) => {
-      if (!publicKey || !signMessage) return;
-      if (!silent) setLoadingWithdrawHistory(true);
-      try {
-        const response = await walletAuthenticatedFetch({
-          wallet: publicKey.toBase58(),
-          signMessage,
-          path: `/api/history?wallet=${publicKey.toBase58()}`,
-          method: "GET",
-        });
-        const json = (await response.json()) as {
-          claimRecords?: Array<{
-            id: string;
-            date: string;
-            amount: number;
-            recipient: string;
-            txSig?: string;
-            status: "success" | "failed" | "submitted";
-            providerMeta?: {
-              action?:
-                | "employee-withdrawal"
-                | "employee-external-transfer"
-                | "employee-private-transfer"
-                | "claim";
-              destinationWallet?: string;
-              creditVerified?: boolean;
-              errorMessage?: string;
-            };
-            privacyConfig?: {
-              fromBalance?: "base" | "ephemeral";
-              toBalance?: "base" | "ephemeral";
-            };
-          }>;
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(json.error || "Failed to load withdraw history");
-        }
-
-        const items = (json.claimRecords ?? []).filter((record) =>
-          record.providerMeta?.action === "employee-withdrawal" ||
-          record.providerMeta?.action === "employee-external-transfer" ||
-          record.providerMeta?.action === "employee-private-transfer",
-        );
-        setWithdrawHistory(items);
-      } catch (err: unknown) {
-        if (!silent) {
-          toast.error(`Withdraw history failed: ${getClaimErrorMessage(err)}`);
-        }
-      } finally {
-        if (!silent) setLoadingWithdrawHistory(false);
-      }
-    },
-    [publicKey, signMessage],
-  );
-
   useEffect(() => {
     if (!publicKey || !signMessage || !primaryStreamId) return undefined;
     const timer = setTimeout(() => {
@@ -242,14 +198,6 @@ export default function ClaimWithdrawPage() {
     }, 0);
     return () => clearTimeout(timer);
   }, [publicKey, signMessage, primaryStreamId, fetchCashoutRequests]);
-
-  useEffect(() => {
-    if (!publicKey || !signMessage) return undefined;
-    const timer = setTimeout(() => {
-      void fetchWithdrawHistory(true);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [publicKey, signMessage, fetchWithdrawHistory]);
 
   const inputWithdrawRecipient =
     withdrawRecipient || publicKey?.toBase58() || "";
@@ -396,14 +344,32 @@ export default function ClaimWithdrawPage() {
       if (isOwnWalletDestination) {
         if (baseCredited) {
           toast.success("Withdrawal successful!", { id: withdrawToastId });
+          setSuccessModal({
+            type: "withdraw",
+            amount: amountToWithdraw,
+            txSig: txSignature,
+            recipient: withdrawRecipientTrimmed,
+          });
         } else {
           toast.warning(
             "Transaction was submitted, but the base-wallet credit is not visible yet. Refresh your wallet and balances.",
             { id: withdrawToastId },
           );
+          setSuccessModal({
+            type: "withdraw",
+            amount: amountToWithdraw,
+            txSig: txSignature,
+            recipient: withdrawRecipientTrimmed,
+          });
         }
       } else {
         toast.success("External wallet transfer successful!", { id: withdrawToastId });
+        setSuccessModal({
+          type: "withdraw",
+          amount: amountToWithdraw,
+          txSig: txSignature,
+          recipient: withdrawRecipientTrimmed,
+        });
       }
 
       if (signMessage) {
@@ -453,7 +419,6 @@ export default function ClaimWithdrawPage() {
         force: true,
         interactive: false,
       });
-      void fetchWithdrawHistory(true);
     } catch (err: unknown) {
       const rawMessage = getClaimErrorMessage(err);
       const isPriorCreditError =
@@ -526,15 +491,13 @@ export default function ClaimWithdrawPage() {
         } catch (historyErr) {
           console.error("Failed to save failed withdraw history", historyErr);
         }
-        void fetchWithdrawHistory(true);
       }
     } finally {
       setWithdrawing(false);
     }
   };
 
-  const formatTxSig = (value?: string) =>
-    value ? `${value.slice(0, 6)}...${value.slice(-6)}` : "Not recorded";
+
 
   const handleInitialize = async () => {
     if (!publicKey || !signTransaction || !signMessage) return;
@@ -689,18 +652,57 @@ export default function ClaimWithdrawPage() {
           employeeWallet: publicKey.toBase58(),
         },
       });
-      await processRes.json();
+      const processJson = await processRes.json();
 
       if (!processRes.ok) {
         toast.error("Claim is stuck. Please click Sync Claim State later.", { id: "payout-toast" });
       } else {
         toast.success("Claim paid successfully!", { id: "payout-toast" });
+
+        // Show success modal
+        setSuccessModal({
+          type: "claim",
+          amount: parseFloat(requestAmount) || 0,
+          txSig: processJson.claim?.paymentTxSignature || signature,
+        });
+
+        // Save the claim record to history so it shows up in Income tab
+        try {
+          const claimAmountUsdc = parseFloat(requestAmount) || 0;
+          await walletAuthenticatedFetch({
+            path: "/api/history",
+            method: "POST",
+            signMessage,
+            wallet: publicKey.toBase58(),
+            body: {
+              kind: "claim-record",
+              wallet: publicKey.toBase58(),
+              amount: claimAmountUsdc,
+              recipient: publicKey.toBase58(),
+              txSig: processJson?.claim?.paymentTxSignature || processJson?.claim?.markPaidTxSignature || undefined,
+              status: "success",
+              privacyConfig: {
+                visibility: "private",
+                fromBalance: "ephemeral",
+                toBalance: "ephemeral",
+              },
+              providerMeta: {
+                provider: "magicblock",
+                action: "claim",
+                destinationWallet: publicKey.toBase58(),
+                creditVerified: true,
+              },
+            },
+          });
+        } catch (historyErr) {
+          console.error("Failed to save claim history", historyErr);
+        }
       }
 
-      await fetchCashoutRequests(false);
+      setSubmittingRequest(false);
+      void fetchCashoutRequests(false);
     } catch (err: unknown) {
       toast.error(`Claim failed: ${getClaimErrorMessage(err)}`);
-    } finally {
       setSubmittingRequest(false);
     }
   };
@@ -966,323 +968,269 @@ export default function ClaimWithdrawPage() {
             </div>
 
             <div className="rounded-[32px] border border-white/10 bg-[#0b0b0d] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.4)] sm:p-6 flex flex-col justify-between">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white">
-                  Claim Salary
-                </h3>
-                <button
-                  onClick={() => void fetchCashoutRequests(false)}
-                  disabled={loadingRequests}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#a8a8aa] transition-all hover:bg-white/10 disabled:opacity-40"
-                >
-                  {loadingRequests ? (
-                    <Loader2 className="animate-spin" size={12} />
-                  ) : (
-                    <RefreshCw size={12} />
-                  )}
-                  Refresh
-                </button>
-              </div>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white">
+                    Claim Salary
+                  </h3>
+                  <button
+                    onClick={() => void fetchCashoutRequests(false)}
+                    disabled={loadingRequests}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#a8a8aa] transition-all hover:bg-white/10 disabled:opacity-40"
+                  >
+                    {loadingRequests ? (
+                      <Loader2 className="animate-spin" size={12} />
+                    ) : (
+                      <RefreshCw size={12} />
+                    )}
+                    Refresh
+                  </button>
+                </div>
 
 	              {onChainPendingClaim && ["needs_sync", "paying"].includes(onChainPendingClaim.status) ? (
-                <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3">
+                  <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3">
 	                  <p className="text-xs font-bold text-rose-200 mb-2">
-                    {onChainPendingClaim.status === "needs_sync"
+                      {onChainPendingClaim.status === "needs_sync"
 	                      ? "Your last payout reached your private balance, but the final bookkeeping step still needs to sync."
 	                      : "Your claim is processing now. If it stays stuck for a while, you can finish the sync here."}
 	                  </p>
-                  <button
-                    onClick={handleSyncClaim}
-                    disabled={syncingClaim}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 py-2 text-[10px] font-bold uppercase tracking-widest text-black transition-all hover:bg-rose-400 disabled:opacity-40"
-                  >
-                    {syncingClaim ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
-                    Sync Claim State
-                  </button>
-                </div>
-              ) : null}
-
-              {onChainPendingClaim && onChainPendingClaim.status === "failed" ? (
-                <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-                  <p className="text-xs font-bold text-red-200 mb-2">
-                    Your claim payout failed, likely due to insufficient funds in your employer&apos;s treasury. You can retry the payout.
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       onClick={handleSyncClaim}
-                      disabled={syncingClaim || cancellingClaim}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 py-2 text-[10px] font-bold uppercase tracking-widest text-black transition-all hover:bg-red-400 disabled:opacity-40"
+                      disabled={syncingClaim}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 py-2 text-[10px] font-bold uppercase tracking-widest text-black transition-all hover:bg-rose-400 disabled:opacity-40"
                     >
                       {syncingClaim ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
-                      Retry Payout
-                    </button>
-                    <button
-                      onClick={handleCancelClaim}
-                      disabled={syncingClaim || cancellingClaim}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-300/40 bg-transparent py-2 text-[10px] font-bold uppercase tracking-widest text-red-100 transition-all hover:bg-red-400/10 disabled:opacity-40"
-                    >
-                      {cancellingClaim ? <Loader2 className="animate-spin" size={14} /> : <LogOut size={14} />}
-                      Cancel Claim
+                      Sync Claim State
                     </button>
                   </div>
-                </div>
-              ) : null}
+                ) : null}
 
-              {onChainPendingClaim && onChainPendingClaim.status === "requested" ? (
-                <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-                  <p className="text-xs font-bold text-amber-200 mb-2">
-                    Your claim is still pending on the payroll engine. You can wait for payout processing or cancel it to restore the amount back into claimable balance.
-                  </p>
-                  <button
-                    onClick={handleCancelClaim}
-                    disabled={cancellingClaim}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/40 bg-transparent py-2 text-[10px] font-bold uppercase tracking-widest text-amber-100 transition-all hover:bg-amber-400/10 disabled:opacity-40"
-                  >
-                    {cancellingClaim ? <Loader2 className="animate-spin" size={14} /> : <LogOut size={14} />}
-                    Cancel Pending Claim
-                  </button>
-                </div>
-              ) : null}
+                {onChainPendingClaim && onChainPendingClaim.status === "failed" ? (
+                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+                    <p className="text-xs font-bold text-red-200 mb-2">
+                      Your claim payout failed, likely due to insufficient funds in your employer&apos;s treasury. You can retry the payout.
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        onClick={handleSyncClaim}
+                        disabled={syncingClaim || cancellingClaim}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 py-2 text-[10px] font-bold uppercase tracking-widest text-black transition-all hover:bg-red-400 disabled:opacity-40"
+                      >
+                        {syncingClaim ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+                        Retry Payout
+                      </button>
+                      <button
+                        onClick={handleCancelClaim}
+                        disabled={syncingClaim || cancellingClaim}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-300/40 bg-transparent py-2 text-[10px] font-bold uppercase tracking-widest text-red-100 transition-all hover:bg-red-400/10 disabled:opacity-40"
+                      >
+                        {cancellingClaim ? <Loader2 className="animate-spin" size={14} /> : <LogOut size={14} />}
+                        Cancel Claim
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {onChainPendingClaim && onChainPendingClaim.status === "requested" ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+                    <p className="text-xs font-bold text-amber-200 mb-2">
+                      Your claim is still pending on the payroll engine. You can wait for payout processing or cancel it to restore the amount back into claimable balance.
+                    </p>
+                    <button
+                      onClick={handleCancelClaim}
+                      disabled={cancellingClaim}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/40 bg-transparent py-2 text-[10px] font-bold uppercase tracking-widest text-amber-100 transition-all hover:bg-amber-400/10 disabled:opacity-40"
+                    >
+                      {cancellingClaim ? <Loader2 className="animate-spin" size={14} /> : <LogOut size={14} />}
+                      Cancel Pending Claim
+                    </button>
+                  </div>
+                ) : null}
 
 	              {hasPendingRequest && (!onChainPendingClaim || !["requested", "needs_sync", "paying", "failed"].includes(onChainPendingClaim.status)) ? (
-	                <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+	                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
 	                  <p className="text-xs font-bold text-amber-200">
 	                    You already have a claim in progress. Wait for it to settle before starting another.
 	                  </p>
 	                </div>
 	              ) : null}
 
-              <div className="grid grid-cols-1 gap-3">
-                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 shadow-inner transition-all focus-within:border-[#1eba98]/40">
-                  <input
-                    type="number"
-                    min="0.000001"
-                    step="0.000001"
-                    placeholder={`Max ${requestMaxUsdc.toFixed(6)} USDC`}
-                    value={requestAmount}
-                    onChange={(e) => setRequestAmount(e.target.value)}
-                    className="flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-[#62626b]"
-                  />
+                <div>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 shadow-inner transition-all focus-within:border-[#1eba98]/40">
+                      <input
+                        type="number"
+                        min="0.000001"
+                        step="0.000001"
+                        placeholder={`Max ${requestMaxUsdc.toFixed(6)} USDC`}
+                        value={requestAmount}
+                        onChange={(e) => setRequestAmount(e.target.value)}
+                        className="flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-[#62626b]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRequestAmount(requestMaxUsdc.toFixed(6))}
+                        disabled={requestMaxUsdc <= 0}
+                        className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[#1eba98] transition-colors hover:text-[#64f0ce] disabled:opacity-30"
+                      >
+                        Max
+                      </button>
+                    </div>
+                  </div>
+                  {!hasLiveSnapshot ? (
+                    <p className="mt-2.5 text-[11px] text-amber-300">
+                      Claiming unlocks after your employer finishes payroll setup and live salary sync is available.
+                    </p>
+                  ) : null}
+                  <div className="mt-2 flex items-center justify-between px-1">
+                    <p className="text-[10px] text-[#8f8f95]">
+                      Live claimable now:{" "}
+                      <span className="font-bold text-[#64f0ce]">
+                        {hasLiveSnapshot ? `${liveClaimableUsdc.toFixed(6)} USDC` : "—"}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setRequestAmount(requestMaxUsdc.toFixed(6))}
+                      disabled={requestMaxUsdc <= 0}
+                      className="text-[10px] font-bold uppercase tracking-wider text-[#1eba98] transition-colors hover:text-[#64f0ce] disabled:opacity-30"
+                    >
+                      Use Max
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-col gap-4">
+                <div>
+                  <p className="mb-3 text-center text-[10px] text-[#62626b]">
+                    Claimed salary lands in your private balance first, then you can withdraw it whenever you want.
+                  </p>
+                  {claimDisabledReason ? (
+                    <p className="mb-3 text-center text-[11px] text-amber-300">
+                      {claimDisabledReason}
+                    </p>
+                  ) : null}
                   <button
-                    type="button"
-                    onClick={() => setRequestAmount(requestMaxUsdc.toFixed(6))}
-                    disabled={requestMaxUsdc <= 0}
-                    className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[#1eba98] transition-colors hover:text-[#64f0ce] disabled:opacity-30"
+                    onClick={handleClaimSalary}
+                    disabled={
+                      submittingRequest ||
+                      !publicKey ||
+                      !registeredEmployeeWallet ||
+                      !privateAccountInitialized ||
+                      !primaryPayrollStream?.stream?.id ||
+                      !hasLiveSnapshot ||
+                      requestMaxUsdc <= 0 ||
+                      hasPendingRequest
+                    }
+                    className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#1eba98] px-6 text-[11px] font-bold uppercase tracking-widest text-black shadow-sm transition-all hover:bg-[#18a786] disabled:opacity-30"
                   >
-                    Max
+                    {submittingRequest ? (
+                      <Loader2 className="animate-spin" size={16} />
+                    ) : (
+                      <Send size={16} />
+                    )}
+                    {hasPendingRequest ? "Pending..." : "Claim Salary"}
                   </button>
                 </div>
               </div>
-	              {!hasLiveSnapshot ? (
-	                <p className="mt-2.5 text-[11px] text-amber-300">
-	                  Claiming unlocks after your employer finishes payroll setup and live salary sync is available.
-	                </p>
-	              ) : null}
-              <div className="mt-2 flex items-center justify-between px-1">
-                <p className="text-[10px] text-[#8f8f95]">
-                  Live claimable now:{" "}
-                  <span className="font-bold text-[#64f0ce]">
-                    {hasLiveSnapshot ? `${liveClaimableUsdc.toFixed(6)} USDC` : "—"}
-                  </span>
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setRequestAmount(requestMaxUsdc.toFixed(6))}
-                  disabled={requestMaxUsdc <= 0}
-                  className="text-[10px] font-bold uppercase tracking-wider text-[#1eba98] transition-colors hover:text-[#64f0ce] disabled:opacity-30"
-                >
-                  Use Max
-                </button>
-              </div>
-
-	              <button
-	                onClick={handleClaimSalary}
-	                disabled={
-	                  submittingRequest ||
-	                  !publicKey ||
-	                  !registeredEmployeeWallet ||
-	                  !privateAccountInitialized ||
-	                  !primaryPayrollStream?.stream?.id ||
-	                  !hasLiveSnapshot ||
-	                  requestMaxUsdc <= 0 ||
-	                  hasPendingRequest
-                }
-                className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-white/10 px-6 text-[11px] font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-white/20 disabled:opacity-30"
-              >
-                {submittingRequest ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Send size={16} />
-                )}
-                {hasPendingRequest ? "Pending..." : "Claim Salary"}
-              </button>
-	              <p className="mt-3 text-center text-[10px] text-[#62626b]">
-	                Claimed salary lands in your private balance first, then you can withdraw it whenever you want.
-	              </p>
-                {claimDisabledReason ? (
-                  <p className="mt-2 text-center text-[11px] text-amber-300">
-                    {claimDisabledReason}
-                  </p>
-                ) : null}
-
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-[#8f8f95]">
-                  Recent Requests
-                </p>
-                {cashoutRequests.length === 0 ? (
-                  <p className="text-xs text-[#8f8f95]">No requests yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {cashoutRequests.slice(0, 5).map((request) => (
-                      <div
-                        key={request.id}
-                        className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-3 py-2"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-white">
-                            $
-                            {request.requestedAmount < 0.01
-                              ? request.requestedAmount.toFixed(6)
-                              : request.requestedAmount.toFixed(2)}{" "}
-                            USDC
-                          </p>
-                          <p className="text-[10px] text-[#8f8f95]">
-                            {new Date(request.createdAt).toLocaleString()} •{" "}
-                            {request.payoutMode ?? "ephemeral"}
-                          </p>
-                        </div>
-                        <span className="rounded-full border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[#a8a8aa]">
-                          {request.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
-          <div className="w-full rounded-[32px] border border-white/10 bg-[#0b0b0d] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.4)] sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-white">
-                    Recent Withdrawals
-                  </h3>
-                  <p className="mt-1 text-xs text-[#8f8f95]">
-                    Signed receipts for your latest base exits and private sends.
-                  </p>
-                </div>
-                <button
-                  onClick={() => void fetchWithdrawHistory(false)}
-                  disabled={loadingWithdrawHistory}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#a8a8aa] transition-all hover:bg-white/10 disabled:opacity-40"
-                >
-                  {loadingWithdrawHistory ? (
-                    <Loader2 className="animate-spin" size={12} />
-                  ) : (
-                    <RefreshCw size={12} />
-                  )}
-                  Refresh
-                </button>
-              </div>
 
-              {withdrawHistory.length === 0 ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-5">
-                  <p className="text-xs text-[#8f8f95]">
-                    No withdrawal receipts yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {withdrawHistory.slice(0, 5).map((record) => {
-                    const isPendingCredit = record.status === "submitted";
-                    const isFailed = record.status === "failed";
-                    const isExternalTransfer =
-                      record.providerMeta?.action === "employee-external-transfer" ||
-                      record.providerMeta?.action === "employee-private-transfer";
-                    return (
-                      <div
-                        key={record.id}
-                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              {isPendingCredit ? (
-                                <Clock3 size={14} className="text-amber-300" />
-                              ) : isFailed ? (
-                                <AlertTriangle size={14} className="text-red-300" />
-                              ) : (
-                                <CheckCircle2 size={14} className="text-[#64f0ce]" />
-                              )}
-                              <p className="text-sm font-bold text-white">
-                                {isExternalTransfer
-                                  ? "External wallet transfer"
-                                  : "Base wallet withdrawal"}
-                              </p>
-                              <span
-                                className={`inline-flex rounded-lg border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                                  isPendingCredit
-                                    ? "border-amber-300/30 bg-amber-400/10 text-amber-200"
-                                    : isFailed
-                                      ? "border-red-400/30 bg-red-500/10 text-red-200"
-                                      : "border-[#1eba98]/20 bg-[#1eba98]/10 text-[#84f7dc]"
-                                }`}
-                              >
-                                {record.status}
-                              </span>
-                            </div>
-                            <p className="mt-2 text-xs text-[#a8a8aa] break-all">
-                              Destination: {record.providerMeta?.destinationWallet ?? record.recipient}
-                            </p>
-                            <p className="mt-1 text-[11px] text-[#8f8f95]">
-                              {new Date(record.date).toLocaleString()}
-                            </p>
-                            <p className="mt-2 text-[11px] text-[#b6b6bc]">
-                              {isPendingCredit
-                                ? "Fee may already be spent. The withdrawal transaction was submitted, but the base-wallet credit is not visible yet."
-                                : isFailed
-                                  ? record.providerMeta?.errorMessage ?? "The transaction did not complete."
-                                  : "Funds were submitted successfully."}
-                            </p>
-                            <div className="mt-3 flex items-center gap-2">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-[#62626b]">
-                                TX
-                              </span>
-                              {record.txSig ? (
-                                <a
-                                  href={`https://solscan.io/tx/${record.txSig}?cluster=devnet`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="group inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[#a8a8aa] transition-all hover:border-white/20 hover:bg-white/10 hover:text-white"
-                                >
-                                  {formatTxSig(record.txSig)}
-                                  <ExternalLink size={12} className="opacity-60 group-hover:opacity-100" />
-                                </a>
-                              ) : (
-                                <span className="text-[10px] uppercase tracking-widest text-[#62626b]">
-                                  Not recorded
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="shrink-0 text-left sm:text-right">
-                            <p className="text-sm font-bold text-white">
-                              {record.amount.toFixed(6)} USDC
-                            </p>
-                            <p className="mt-1 text-[10px] uppercase tracking-widest text-[#8f8f95]">
-                              {record.privacyConfig?.fromBalance ?? "ephemeral"} → {record.privacyConfig?.toBalance ?? "unknown"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+        </div>
+      </div>
+
+      {successModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setSuccessModal(null)}
+        >
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+          <div
+            className="relative w-full max-w-md rounded-[2.5rem] border border-white/10 bg-[#0b0b0d] p-8 shadow-[0_10px_40px_rgba(0,0,0,0.8)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSuccessModal(null)}
+              className="absolute right-6 top-6 rounded-xl p-2 text-[#62626b] transition-colors hover:bg-white/5 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#1eba98]/20 bg-[#1eba98]/10">
+              <CheckCircle2 size={28} className="text-[#1eba98]" />
             </div>
+
+            <h2 className="mb-1 text-2xl font-bold text-white">
+              {successModal.type === "claim" ? "Salary Claimed" : "Withdrawal Complete"}
+            </h2>
+            <p className="mb-8 text-sm text-[#8f8f95]">
+              {successModal.type === "claim" 
+                ? "Your salary has been successfully claimed to your private balance."
+                : `Your withdrawal to ${successModal.recipient || "your wallet"} was processed successfully.`}
+            </p>
+
+            <div className="mb-8 rounded-2xl border border-white/5 bg-white/5 p-4">
+              <p className="mb-1 text-xs uppercase tracking-wider text-[#8f8f95]">
+                Amount
+              </p>
+              <p className="text-xl font-bold text-white">
+                {successModal.amount.toFixed(6)}{" "}
+                <span className="text-sm font-medium text-[#1eba98]">
+                  USDC
+                </span>
+              </p>
+            </div>
+
+            {successModal.txSig && (
+              <div className="mb-8 space-y-2">
+                <a
+                  href={`https://solscan.io/tx/${successModal.txSig}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-3 transition-all hover:border-white/10 hover:bg-white/10"
+                >
+                  <span className="font-mono text-xs text-[#8f8f95] transition-colors group-hover:text-white">
+                    Transaction
+                  </span>
+                  <div className="flex items-center gap-1.5 font-mono text-xs text-[#1eba98]">
+                    {successModal.txSig.slice(0, 8)}...
+                    <ExternalLink size={11} />
+                  </div>
+                </a>
+              </div>
+            )}
+
+            {publicKey && (
+              <div className="mb-8 space-y-2">
+                <a
+                  href={`https://solscan.io/account/${publicKey.toBase58()}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-3 transition-all hover:border-white/10 hover:bg-white/10"
+                >
+                  <span className="font-mono text-xs text-[#8f8f95] transition-colors group-hover:text-white">
+                    Devnet USDC Balance
+                  </span>
+                  <div className="flex items-center gap-1.5 font-mono text-xs text-[#1eba98]">
+                    {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
+                    <ExternalLink size={11} />
+                  </div>
+                </a>
+              </div>
+            )}
+
+            <button
+              onClick={() => setSuccessModal(null)}
+              className="w-full rounded-2xl bg-[#1eba98] py-3.5 text-sm font-bold text-black transition-colors hover:bg-[#18a786]"
+            >
+              Done
+            </button>
           </div>
         </div>
+      )}
     </EmployeeLayout>
   );
 }
