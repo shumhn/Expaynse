@@ -39,6 +39,21 @@ import type {
   PayrollHistoryRun,
 } from "./manual-types";
 
+const MONTH_OPTIONS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
 function ManualBatchPayrollContent() {
   const searchParams = useSearchParams();
   const { publicKey, signMessage } = useWallet();
@@ -60,6 +75,27 @@ function ManualBatchPayrollContent() {
   const queryEmployeeId = searchParams.get("employee")?.trim() ?? "";
   const initialSelectionAppliedRef = useRef(false);
   const companyId = company?.id ?? null;
+  const [payPeriodMonth, setPayPeriodMonth] = useState<number>(() =>
+    new Date().getMonth(),
+  );
+  const [payPeriodYearInput, setPayPeriodYearInput] = useState<string>(() =>
+    String(new Date().getFullYear()),
+  );
+
+  const payPeriodYear = useMemo(() => {
+    const cleaned = payPeriodYearInput.replace(/[^\d]/g, "").slice(0, 4);
+    if (cleaned.length === 4) return cleaned;
+    return String(new Date().getFullYear());
+  }, [payPeriodYearInput]);
+
+  const payPeriod = useMemo(
+    () => `${payPeriodYear}-${String(payPeriodMonth + 1).padStart(2, "0")}`,
+    [payPeriodMonth, payPeriodYear],
+  );
+
+  const payPeriodLabel = useMemo(() => {
+    return `${MONTH_OPTIONS[payPeriodMonth]} ${payPeriodYear}`;
+  }, [payPeriodMonth, payPeriodYear]);
 
   const privatePayrollEmployees = useMemo(
     () => companyEmployees,
@@ -433,6 +469,7 @@ function ManualBatchPayrollContent() {
         method: "POST",
         body: {
           employerWallet: publicKey.toBase58(),
+          payPeriod,
           recipients: validEmployees.map((employee) => ({
             employeeId: employee.employeeId,
             name: employee.name,
@@ -502,7 +539,15 @@ function ManualBatchPayrollContent() {
     } finally {
       setRunning(false);
     }
-  }, [company?.id, publicKey, signMessage, totalAmount, validEmployees, refreshPrivateBalance]);
+  }, [
+    company?.id,
+    payPeriod,
+    publicKey,
+    signMessage,
+    totalAmount,
+    validEmployees,
+    refreshPrivateBalance,
+  ]);
 
   const statusIcon = (status: StepStatus) => {
     switch (status) {
@@ -761,6 +806,41 @@ function ManualBatchPayrollContent() {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="mt-6 border-t border-white/10 pt-5">
+                    <p className="mb-3 font-lexend text-[11px] font-bold uppercase tracking-[0.18em] text-neutral-500">
+                      Pay Period (Salary Month)
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+                      <select
+                        value={payPeriodMonth}
+                        onChange={(event) =>
+                          setPayPeriodMonth(Number(event.target.value))
+                        }
+                        className="rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 font-lexend text-sm text-white outline-none focus:border-emerald-400/40"
+                      >
+                        {MONTH_OPTIONS.map((label, index) => (
+                          <option key={label} value={index} className="bg-[#101010]">
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={payPeriodYearInput}
+                        onChange={(event) =>
+                          setPayPeriodYearInput(
+                            event.target.value.replace(/[^\d]/g, "").slice(0, 4),
+                          )
+                        }
+                        placeholder="YYYY"
+                        className="rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 font-mono text-sm text-white outline-none placeholder:text-neutral-700 focus:border-emerald-400/40"
+                      />
+                    </div>
+                    <p className="mt-2 font-lexend text-xs text-neutral-500">
+                      This transfer will be recorded under <span className="text-neutral-300">{payPeriodLabel}</span>.
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -1043,6 +1123,7 @@ function ManualBatchPayrollContent() {
                   id: "latest-success",
                   date: new Date().toISOString(),
                   mode: "private_payroll",
+                  payPeriod,
                   totalAmount: successModal.totalAmount,
                   employeeCount: successModal.employeeCount,
                   recipientAddresses: [],
