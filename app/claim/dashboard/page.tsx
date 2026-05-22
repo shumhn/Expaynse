@@ -274,7 +274,7 @@ export default function ClaimDashboardPage() {
                 <div className="rounded-2xl border border-[#1eba98]/35 bg-[#1eba98]/10 p-6">
                   <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#84f7dc]">Your {cycleInfo.label} Salary</p>
                   <p className="mt-2 text-3xl font-bold tracking-tight text-white">
-                    {monthlySalaryAmount !== null ? `$${formatUsdc(monthlySalaryAmount, 2)}` : "—"}
+                    {monthlySalaryAmount !== null ? `$${formatUsdc(monthlySalaryAmount, 6)}` : "—"}
                   </p>
                   <p className="mt-1.5 text-[10px] text-[#9ce8d5]">
                     {monthlySalaryAmount !== null ? "Monthly context from live PER state." : "Available after PER sync."}
@@ -283,22 +283,22 @@ export default function ClaimDashboardPage() {
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
                   <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#8f8f95]">Earned So Far</p>
                   <p className="mt-2 text-3xl font-bold tracking-tight text-white">
-                    {earnedThisMonthAmount !== null ? `$${formatUsdc(earnedThisMonthAmount, 2)}` : "—"}
+                    {earnedThisMonthAmount !== null ? `$${formatUsdc(earnedThisMonthAmount, 6)}` : "—"}
                   </p>
                   <p className="mt-1.5 text-[10px] text-[#a8a8aa]">
                     {remainingThisMonthAmount !== null
-                      ? `Remaining: $${formatUsdc(remainingThisMonthAmount, 2)}`
+                      ? `Remaining: $${formatUsdc(remainingThisMonthAmount, 6)}`
                       : "Requires signed PER snapshot"}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
                   <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#8f8f95]">Available To Claim</p>
                   <p className="mt-2 text-3xl font-bold tracking-tight text-white">
-                    {claimableNowAmount !== null ? `$${formatUsdc(claimableNowAmount, 4)}` : "—"}
+                    {claimableNowAmount !== null ? `$${formatUsdc(claimableNowAmount, 6)}` : "—"}
                   </p>
                   <p className="mt-1.5 text-[10px] text-[#a8a8aa]">
                     {claimableNowAmount !== null
-                      ? `Claimed: $${formatUsdc(claimedThisMonthAmount ?? 0, 2)}`
+                      ? `Claimed: $${formatUsdc(claimedThisMonthAmount ?? 0, 6)}`
                       : "Sign once to unlock claimable amount"}
                   </p>
                 </div>
