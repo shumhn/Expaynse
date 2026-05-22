@@ -233,6 +233,7 @@ export async function savePayrollRunHistory(input: {
 }) {
   await savePayrollRun({
     wallet: input.wallet,
+    mode: "streaming",
     totalAmount: input.totalAmountMicro / 1_000_000,
     employeeCount: input.employeeCount,
     recipientAddresses: input.recipientAddresses,
