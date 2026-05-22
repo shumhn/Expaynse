@@ -42,6 +42,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", href: "/claim/dashboard", icon: LayoutDashboard, role: "employee" },
   { label: "Balances", href: "/claim/balances", icon: Wallet, role: "employee" },
   { label: "Withdraw", href: "/claim/withdraw", icon: ArrowUpRight, role: "employee" },
+  { label: "History", href: "/claim/history", icon: History, role: "employee" },
   { label: "Treasury", href: "/treasury", icon: Landmark, role: "employer" },
   { label: "Activity", href: "/activity", icon: Bell, role: "employer" },
 ];
