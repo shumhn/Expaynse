@@ -22,6 +22,7 @@ interface PayrollRun {
   id: string;
   date: string;
   mode?: "streaming" | "private_payroll";
+  payPeriod?: string;
   totalAmount: number;
   employeeCount: number;
   employeeNames?: string[];
@@ -29,6 +30,9 @@ interface PayrollRun {
   depositSig?: string;
   transferSig?: string;
   status: "success" | "failed";
+  providerMeta?: {
+    action?: string;
+  };
 }
 interface ClaimRecord { id: string; date: string; amount: number; recipient: string; txSig?: string; status: "success" | "failed"; }
 
@@ -42,6 +46,20 @@ type Transaction = {
   txSig?: string;
   payrollMode?: "streaming" | "private_payroll";
 };
+
+function resolvePayrollRunMode(
+  run: PayrollRun,
+): "streaming" | "private_payroll" {
+  if (run.mode === "private_payroll") return "private_payroll";
+  if (run.mode === "streaming") return "streaming";
+  if (run.providerMeta?.action === "employee-private-transfer") {
+    return "private_payroll";
+  }
+  if (typeof run.payPeriod === "string" && run.payPeriod.trim().length > 0) {
+    return "private_payroll";
+  }
+  return "streaming";
+}
 
 function TreasuryPageContent() {
   const { publicKey, signMessage } = useWallet();
@@ -203,8 +221,21 @@ function TreasuryPageContent() {
 
   const active = streams.filter((s) => s.status === "active");
   const totalAccrued = streams.reduce((sum, s) => sum + s.accruedUnpaid, 0);
-  const totalPaid = streams.reduce((sum, s) => sum + s.totalPaid, 0);
+  const totalStreamPaid = streams.reduce((sum, s) => sum + s.totalPaid, 0);
   const dailyBurn = active.reduce((sum, s) => sum + s.ratePerSecond * 86400, 0);
+
+  const totalPrivateTransferPaid = useMemo(
+    () =>
+      payrollRuns.reduce((sum, run) => {
+        const isPrivateTransfer = resolvePayrollRunMode(run) === "private_payroll";
+        const isSuccessful = run.status === "success";
+        if (!isPrivateTransfer || !isSuccessful) return sum;
+        return sum + (Number.isFinite(run.totalAmount) ? run.totalAmount : 0);
+      }, 0),
+    [payrollRuns],
+  );
+
+  const totalPaid = totalStreamPaid + totalPrivateTransferPaid;
 
   const verifiedSetupActions = useMemo(
     () =>
@@ -240,7 +271,7 @@ function TreasuryPageContent() {
         ? getEmployeeName(a.recipientAddresses[0])
         : `${a.employeeCount} ${a.employeeCount === 1 ? 'Employee' : 'Employees'}`,
       txSig: a.depositSig || a.transferSig,
-      payrollMode: (a.mode === "private_payroll" ? "private_payroll" : "streaming") as
+      payrollMode: resolvePayrollRunMode(a) as
         | "streaming"
         | "private_payroll",
     })),
@@ -320,15 +351,28 @@ function TreasuryPageContent() {
     toast.success("Ledger exported to CSV");
   };
 
+  const successfulVolumeTransactions = useMemo(
+    () =>
+      transactions.filter(
+        (tx) =>
+          tx.status === "success" &&
+          Number.isFinite(tx.amount) &&
+          tx.amount > 0 &&
+          (tx.type === "Private Vault Deposit" ||
+            tx.type === "Payroll Disbursement" ||
+            tx.type === "Employee Claim"),
+      ),
+    [transactions],
+  );
+
   // Analytics Data — dynamic range
   const allTxDates = useMemo(() => {
-    const items: { date: string; amount: number }[] = [
-      ...verifiedSetupActions
-        .map((action) => ({ date: action.date, amount: action.amount || 0 })),
-      ...payrollRuns.map((run) => ({ date: run.date, amount: run.totalAmount })),
-    ];
+    const items = successfulVolumeTransactions.map((tx) => ({
+      date: tx.date,
+      amount: tx.amount,
+    }));
     return items;
-  }, [verifiedSetupActions, payrollRuns]);
+  }, [successfulVolumeTransactions]);
 
   const volumeData = useMemo(() => {
     const now = new Date();
@@ -399,16 +443,67 @@ function TreasuryPageContent() {
   }, [chartRange, allTxDates]);
 
   const distributionData = useMemo(() => {
-    const depositsTotal = trackedDeposited;
-    const payrollTotal = payrollRuns.reduce((sum, a) => sum + a.totalAmount, 0);
-    const claimsTotal = claimRecords.reduce((sum, a) => sum + a.amount, 0);
+    const depositsTotal = successfulVolumeTransactions
+      .filter((tx) => tx.type === "Private Vault Deposit")
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const streamingTotal = successfulVolumeTransactions
+      .filter(
+        (tx) =>
+          tx.type === "Payroll Disbursement" &&
+          (tx.payrollMode ?? "streaming") === "streaming",
+      )
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const transferTotal = successfulVolumeTransactions
+      .filter(
+        (tx) =>
+          tx.type === "Payroll Disbursement" &&
+          tx.payrollMode === "private_payroll",
+      )
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const claimsTotal = successfulVolumeTransactions
+      .filter((tx) => tx.type === "Employee Claim")
+      .reduce((sum, tx) => sum + tx.amount, 0);
 
     return [
       { name: "Deposits", value: depositsTotal, color: "#1eba98" },
-      { name: "Payroll", value: payrollTotal, color: "#3b82f6" },
+      { name: "Streaming", value: streamingTotal, color: "#3b82f6" },
+      { name: "Transfers", value: transferTotal, color: "#8b5cf6" },
       { name: "Claims", value: claimsTotal, color: "#3b3b3b" },
     ].filter(d => d.value > 0);
-  }, [trackedDeposited, payrollRuns, claimRecords]);
+  }, [successfulVolumeTransactions]);
+
+  const formatChartAmount = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return "$0";
+    if (value >= 1000) return `$${Math.round(value).toLocaleString()}`;
+    if (value >= 1) return `$${value.toFixed(2)}`;
+    if (value === 0) return "$0";
+    return `$${value.toFixed(6)}`;
+  }, []);
+
+  const formatTxAmount = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return "0.00";
+    const abs = Math.abs(value);
+    if (abs === 0) return "0.00";
+    if (abs >= 1) {
+      return abs.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+    if (abs >= 0.01) {
+      return abs.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+      });
+    }
+    return abs.toLocaleString(undefined, {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 6,
+    });
+  }, []);
 
   return (
     <EmployerLayout>
@@ -484,7 +579,7 @@ function TreasuryPageContent() {
           <div className="rounded-3xl border border-white/10 bg-[#0a0a0a] p-5 shadow-sm relative overflow-hidden">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a8a8aa]">Total Payouts</p>
             <p className="mt-2 text-2xl font-bold tracking-tight text-white">{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC</p>
-            <p className="mt-1 text-xs text-[#a8a8aa]">All-time payroll volume</p>
+            <p className="mt-1 text-xs text-[#a8a8aa]">All-time streaming + private transfer volume</p>
             <div className="absolute top-5 right-5 text-[#8f8f95]">
               <ArrowUpRight size={20} />
             </div>
@@ -531,7 +626,9 @@ function TreasuryPageContent() {
                 ))}
               </div>
             </div>
-            <p className="text-xs text-[#8f8f95] mb-6">{chartRange === "24H" ? "Hourly" : chartRange === "7D" ? "Daily (7 days)" : chartRange === "30D" ? "Daily (30 days)" : "Monthly"} volume (USDC)</p>
+            <p className="text-xs text-[#8f8f95] mb-6">
+              {chartRange === "24H" ? "Hourly" : chartRange === "7D" ? "Daily (7 days)" : chartRange === "30D" ? "Daily (30 days)" : "Monthly"} volume (USDC), including deposits, streaming, and private transfers
+            </p>
             <div className="h-[240px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={volumeData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
@@ -542,8 +639,11 @@ function TreasuryPageContent() {
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#8f8f95" }} dy={10} interval={chartRange === "30D" ? 4 : "preserveStartEnd"} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#8f8f95" }} tickFormatter={(val) => `$${val.toFixed(0)}`} />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", background: "#111", color: "#fff", boxShadow: "0 10px 30px rgba(0,0,0,0.4)" }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#8f8f95" }} tickFormatter={(val) => formatChartAmount(Number(val))} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", background: "#111", color: "#fff", boxShadow: "0 10px 30px rgba(0,0,0,0.4)" }}
+                    formatter={(value: any) => [formatChartAmount(Number(value)), "total"]}
+                  />
                   <Area type="monotone" dataKey="total" stroke="#1eba98" strokeWidth={2} fillOpacity={1} fill="url(#colorTotal)" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -701,7 +801,7 @@ function TreasuryPageContent() {
                       </td>
                       <td className="py-4 px-6 text-center">
                         <div className="text-sm font-bold text-white">
-                          {item.type === "Private Vault Deposit" ? "+" : "-"}${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          {item.type === "Private Vault Deposit" ? "+" : "-"}${formatTxAmount(item.amount)}
                         </div>
                         <div className="text-[10px] text-[#8f8f95] mt-0.5">USDC</div>
                       </td>
