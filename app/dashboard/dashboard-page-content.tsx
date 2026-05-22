@@ -117,11 +117,51 @@ interface HistoryPayrollRun {
   id: string;
   date: string;
   mode?: "streaming" | "private_payroll";
+  payPeriod?: string;
   totalAmount: number;
   employeeIds?: string[];
   recipientAddresses?: string[];
   employeeAmounts?: number[];
   status: "success" | "failed" | "submitted";
+  providerMeta?: {
+    action?: string;
+  };
+}
+
+type DashboardRecentActivity =
+  | {
+      id: string;
+      kind: "stream_run";
+      date: string;
+      status: RunStatus;
+      title: string;
+      subtitle: string;
+      peopleText: string;
+      amountUsd: number;
+    }
+  | {
+      id: string;
+      kind: "private_transfer";
+      date: string;
+      status: "success" | "failed" | "submitted";
+      title: string;
+      subtitle: string;
+      peopleText: string;
+      amountUsd: number;
+    };
+
+function resolvePayrollRunMode(
+  run: HistoryPayrollRun,
+): "streaming" | "private_payroll" {
+  if (run.mode === "private_payroll") return "private_payroll";
+  if (run.mode === "streaming") return "streaming";
+  if (run.providerMeta?.action === "employee-private-transfer") {
+    return "private_payroll";
+  }
+  if (typeof run.payPeriod === "string" && run.payPeriod.trim().length > 0) {
+    return "private_payroll";
+  }
+  return "streaming";
 }
 
 function formatUsd(value: number) {
@@ -155,6 +195,16 @@ function statusChip(status: RunStatus | CycleStatus) {
   }
   if (status === "partially_failed") {
     return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+  }
+  return "bg-red-500/10 text-red-400 border-red-500/20";
+}
+
+function historyStatusChip(status: HistoryPayrollRun["status"]) {
+  if (status === "success") {
+    return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+  }
+  if (status === "submitted") {
+    return "bg-blue-500/10 text-blue-400 border-blue-500/20";
   }
   return "bg-red-500/10 text-red-400 border-red-500/20";
 }
@@ -482,11 +532,55 @@ export default function DashboardPage() {
     [runs],
   );
 
+  const recentActivities = useMemo<DashboardRecentActivity[]>(() => {
+    const streamActivities: DashboardRecentActivity[] = runs.map((run) => ({
+      id: `stream:${run.id}`,
+      kind: "stream_run",
+      date: run.createdAt,
+      status: run.status,
+      title: `Run ${run.id.slice(0, 8)}...`,
+      subtitle: `${formatDate(run.createdAt)} • Cycle ${run.cycleId.slice(0, 8)}...`,
+      peopleText: `${run.totals?.paidCount ?? 0}/${run.totals?.itemCount ?? 0}`,
+      amountUsd: run.totals?.netAmount ?? 0,
+    }));
+
+    const privateActivities: DashboardRecentActivity[] = historyPayrollRuns
+      .filter(
+        (run) =>
+          resolvePayrollRunMode(run) === "private_payroll" &&
+          Number.isFinite(run.totalAmount) &&
+          run.totalAmount > 0,
+      )
+      .map((run) => ({
+        id: `private:${run.id}`,
+        kind: "private_transfer",
+        date: run.date,
+        status: run.status,
+        title: "Private Transfer",
+        subtitle: run.payPeriod
+          ? `${formatDate(run.date)} • ${run.payPeriod}`
+          : formatDate(run.date),
+        peopleText:
+          run.employeeIds?.length ||
+          run.recipientAddresses?.length
+            ? String(
+                (run.employeeIds?.length ?? 0) ||
+                  (run.recipientAddresses?.length ?? 0),
+              )
+            : "1",
+        amountUsd: run.totalAmount,
+      }));
+
+    return [...streamActivities, ...privateActivities]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10);
+  }, [runs, historyPayrollRuns]);
+
   const privateTransferRuns = useMemo(
     () =>
       historyPayrollRuns.filter(
         (run) =>
-          run.mode === "private_payroll" &&
+          resolvePayrollRunMode(run) === "private_payroll" &&
           run.status !== "failed" &&
           Number.isFinite(run.totalAmount) &&
           run.totalAmount > 0,
@@ -729,7 +823,7 @@ export default function DashboardPage() {
             
             {company ? (
               <Link
-                href="/disburse"
+                href="/payouts"
                 data-guide="run-payroll"
                 className="inline-flex h-[44px] items-center gap-2 rounded-2xl bg-[#1eba98] px-5 text-sm font-semibold text-black transition-colors hover:bg-[#1eba98]/80 shadow-[0_0_20px_rgba(30,186,152,0.3)]"
               >
@@ -806,38 +900,51 @@ export default function DashboardPage() {
               <div className="rounded-3xl border border-white/10 bg-[#0a0a0a] p-6 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <PlayCircle size={16} className="text-[#a8a8aa]" />
-                  <p className="text-sm font-bold text-white">Recent Payroll Runs</p>
+                  <p className="text-sm font-bold text-white">Recent Payroll Activity</p>
                 </div>
                 <div className="space-y-3">
-                  {runs.length === 0 ? (
-                    <p className="text-sm text-[#a8a8aa]">No payroll runs yet.</p>
+                  {recentActivities.length === 0 ? (
+                    <p className="text-sm text-[#a8a8aa]">No payroll activity yet.</p>
                   ) : (
-                    runs.slice(0, 8).map((run) => (
+                    recentActivities.map((activity) => (
                       <div
-                        key={run.id}
+                        key={activity.id}
                         className="rounded-2xl border border-white/5 bg-white/5 px-4 py-3"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-white">{run.id.slice(0, 8)}...</p>
-                            <p className="text-xs text-[#a8a8aa]">{formatDate(run.createdAt)} • {run.cycleId.slice(0, 8)}...</p>
+                            <p className="text-sm font-semibold text-white">{activity.title}</p>
+                            <p className="text-xs text-[#a8a8aa]">{activity.subtitle}</p>
                           </div>
-                          <span
-                            className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${statusChip(
-                              run.status,
-                            )}`}
-                          >
-                            {run.status.replace("_", " ")}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                                activity.kind === "stream_run"
+                                  ? "border-blue-500/20 bg-blue-500/10 text-blue-300"
+                                  : "border-violet-500/20 bg-violet-500/10 text-violet-300"
+                              }`}
+                            >
+                              {activity.kind === "stream_run" ? "stream" : "private"}
+                            </span>
+                            <span
+                              className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                                activity.kind === "stream_run"
+                                  ? statusChip(activity.status)
+                                  : historyStatusChip(activity.status)
+                              }`}
+                            >
+                              {activity.status.replace("_", " ")}
+                            </span>
+                          </div>
                         </div>
                         <div className="mt-2 flex items-center gap-4 text-xs text-[#a8a8aa]">
                           <span className="inline-flex items-center gap-1">
                             <Users size={12} />
-                            {run.totals?.paidCount ?? 0}/{run.totals?.itemCount ?? 0}
+                            {activity.peopleText}
                           </span>
                           <span className="inline-flex items-center gap-1">
                             <DollarSign size={12} />
-                            {formatUsd(run.totals?.netAmount ?? 0)}
+                            {formatUsd(activity.amountUsd)}
                           </span>
                         </div>
                       </div>
@@ -849,11 +956,13 @@ export default function DashboardPage() {
               <div className="rounded-3xl border border-white/10 bg-[#0a0a0a] p-6 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <CalendarDays size={16} className="text-[#a8a8aa]" />
-                  <p className="text-sm font-bold text-white">Payroll Cycles</p>
+                  <p className="text-sm font-bold text-white">Scheduled Payroll Cycles</p>
                 </div>
                 <div className="space-y-3">
                   {cycles.length === 0 ? (
-                    <p className="text-sm text-[#a8a8aa]">No payroll cycles yet.</p>
+                    <p className="text-sm text-[#a8a8aa]">
+                      No scheduled cycles yet. Private transfers appear in Recent Payroll Activity.
+                    </p>
                   ) : (
                     cycles.slice(0, 8).map((cycle) => (
                       <div
@@ -893,6 +1002,7 @@ export default function DashboardPage() {
             <div className="rounded-2xl border border-white/10 bg-[#0a0a0a] p-4 text-xs text-[#a8a8aa]">
               Data sources: <span className="font-semibold text-white">/api/payroll-runs/runs</span>,{" "}
               <span className="font-semibold text-white">/api/payroll-runs/cycles</span>,{" "}
+              <span className="font-semibold text-white">/api/history</span>,{" "}
               <span className="font-semibold text-white">/api/employees</span>,{" "}
               <span className="font-semibold text-white">/api/streams</span>.
               Total gross tracked: <span className="font-semibold text-white">{formatUsd(totalGross)}</span>.
