@@ -21,13 +21,16 @@ type PrivatePayrollRun = {
   id: string;
   date: string;
   mode?: "streaming" | "private_payroll";
+  payPeriod?: string;
   totalAmount: number;
   employeeCount: number;
   employeeIds?: string[];
   employeeNames?: string[];
+  employeeAmounts?: number[];
   recipientAddresses: string[];
   depositSig?: string;
   transferSig?: string;
+  transferSigs?: string[];
   status: "success" | "failed";
 };
 
@@ -65,6 +68,17 @@ function downloadCsv(filename: string, rows: string[][]) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+function formatPayPeriod(period?: string) {
+  if (!period) return "Not set";
+  const [year, month] = period.split("-");
+  if (!year || !month) return period;
+  const monthIndex = Number(month) - 1;
+  if (monthIndex < 0 || monthIndex > 11) return period;
+  return `${new Date(Number(year), monthIndex, 1).toLocaleString("en-US", {
+    month: "long",
+  })} ${year}`;
 }
 
 export default function PrivatePayrollHistoryPage() {
@@ -186,6 +200,7 @@ export default function PrivatePayrollHistoryPage() {
       [
         [
           "date",
+          "pay_period",
           "status",
           "total_amount_usdc",
           "employee_count",
@@ -195,6 +210,7 @@ export default function PrivatePayrollHistoryPage() {
         ],
         ...filteredRuns.map((run) => [
           run.date,
+          run.payPeriod ?? "",
           run.status,
           run.totalAmount.toFixed(2),
           String(run.employeeCount),
@@ -363,6 +379,9 @@ export default function PrivatePayrollHistoryPage() {
                         </p>
                         <p className="mt-1 text-xs text-[#8f8f95]">
                           {new Date(run.date).toLocaleString()}
+                        </p>
+                        <p className="mt-1 text-xs text-[#8f8f95]">
+                          Pay period: {formatPayPeriod(run.payPeriod)}
                         </p>
                         <p className="mt-2 text-sm text-[#c8c8cc]">
                           {(run.employeeNames ?? []).length > 0
