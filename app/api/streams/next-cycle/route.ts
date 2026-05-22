@@ -146,7 +146,7 @@ export async function PATCH(request: NextRequest) {
     const streams = await listStreams(body.employerWallet);
     const currentStream = getLatestNonStoppedStream(streams, body.employeeId);
     const nowMs = Date.now();
-    const currentEndMs = currentStream?.endsAt ? new Date(currentStream.endsAt).getTime() : null;
+    const currentEndMs = currentStream?.compensationSnapshot?.endsAt ? new Date(currentStream.compensationSnapshot.endsAt).getTime() : null;
     const beforeCurrentEnd =
       currentEndMs !== null && Number.isFinite(currentEndMs) && nowMs < currentEndMs;
     if (beforeCurrentEnd && !body.force) {
