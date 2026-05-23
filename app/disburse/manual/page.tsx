@@ -275,7 +275,7 @@ function ManualBatchPayrollContent() {
     selectedEmployee,
   });
 
-  const directEmployeeFlow = Boolean(queryEmployeeId && selectedEmployee);
+  const directEmployeeFlow = Boolean(queryEmployeeId);
 
   useEffect(() => {
     if (!publicKey || !signMessage) return;
