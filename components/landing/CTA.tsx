@@ -20,9 +20,14 @@ export function CTA() {
                         <br />
                         The Future of Money Moves in Real-Time
                     </h2>
-                    <Link href="/dashboard" className="mt-8 inline-flex px-8 py-3 bg-black text-white text-sm font-bold rounded-full hover:scale-105 transition-transform duration-300">
-                        Launch App
-                    </Link>
+                    <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+                        <Link href="/dashboard" className="inline-flex px-8 py-3 bg-black text-white text-sm font-bold rounded-full hover:scale-105 transition-transform duration-300 border-2 border-black">
+                            Launch App
+                        </Link>
+                        <Link href="/claim/dashboard" className="inline-flex px-8 py-3 bg-transparent text-black text-sm font-bold rounded-full hover:scale-105 transition-transform duration-300 border-2 border-black hover:bg-black hover:text-white">
+                            Claim Salary
+                        </Link>
+                    </div>
                 </div>
             </motion.div>
         </section>

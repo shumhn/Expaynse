@@ -29,7 +29,7 @@ export function Hero() {
             </motion.div>
 
             <div className="max-w-7xl grid lg:grid-cols-2 gap-16 items-center w-full mt-16 md:mt-24">
-                <div className="flex flex-col gap-6 z-10">
+                <div className="flex flex-col gap-6 z-10 -mt-8 md:-mt-20">
 
                     <motion.h1
                         initial={{ opacity: 0, y: 20 }}
@@ -58,9 +58,13 @@ export function Hero() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.6, duration: 1, ease: [0.16, 1, 0.3, 1] }}
                         style={{ willChange: "transform, opacity" }}
+                        className="flex flex-wrap items-center gap-4"
                     >
                         <Link href="/dashboard" className="inline-flex px-8 py-3 bg-kast-teal text-black font-bold rounded-full hover:scale-105 transition-transform border-2 border-kast-teal hover:bg-transparent hover:text-kast-teal">
                             Launch App
+                        </Link>
+                        <Link href="/claim/dashboard" className="inline-flex px-8 py-3 bg-transparent text-kast-teal font-bold rounded-full hover:scale-105 transition-transform border-2 border-kast-teal hover:bg-kast-teal hover:text-black">
+                            Claim Salary
                         </Link>
                     </motion.div>
 
