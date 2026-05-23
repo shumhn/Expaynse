@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import {
-  ChevronLeft, ChevronRight, Zap, Shield, Globe,
+  ChevronLeft, ChevronRight, Zap, Shield, Globe, PlayCircle,
   CheckCircle, DollarSign, Check, X
 } from "lucide-react";
 
@@ -486,16 +486,53 @@ const slides = [
         <div className="-mt-12">
           <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-16">Find us on</p>
           <h2 className="text-[54px] md:text-[68px] font-bold text-white tracking-tight mb-8">expaynse.xyz</h2>
-          <p className="text-[18px] md:text-[22px] text-gray-400 font-medium">Follow our journey on X.</p>
+          <p className="text-[18px] md:text-[22px] text-gray-400 font-medium">Follow our journey and stay close to the build.</p>
         </div>
         
-        <div className="flex justify-center items-center gap-6 text-[15px] md:text-[17px] font-medium tracking-wide">
+        <div className="flex flex-wrap justify-center items-center gap-6 text-[15px] md:text-[17px] font-medium tracking-wide">
           <a href="https://expaynse.xyz" target="_blank" rel="noopener noreferrer" className="text-white hover:text-kast-teal transition-colors">
             https://expaynse.xyz
           </a>
           <span className="text-white/20">/</span>
           <a href="https://x.com/expaynse" target="_blank" rel="noopener noreferrer" className="text-kast-teal hover:text-kast-teal/80 transition-colors">
             https://x.com/expaynse
+          </a>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "watch-demo",
+    content: (
+      <div className="flex h-full w-full items-center justify-center px-6">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 text-center">
+          <div className="space-y-6">
+            <p className="text-[12px] font-bold uppercase tracking-[0.3em] text-kast-teal">Last Step</p>
+            <h2 className="text-[50px] md:text-[72px] font-bold tracking-tight text-white">Watch the Demo</h2>
+            <p className="mx-auto max-w-3xl text-[18px] md:text-[24px] font-medium leading-relaxed text-gray-400">
+              See how Expaynse handles private transfers and real-time private payroll end to end.
+            </p>
+          </div>
+
+          <a
+            href="https://www.youtube.com/watch?v=_hthqs5I7Xs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group w-full max-w-3xl rounded-[32px] border border-kast-teal/30 bg-gradient-to-br from-kast-teal/10 via-zinc-950 to-zinc-950 px-8 py-12 shadow-[0_0_80px_rgba(30,186,152,0.08)] transition-all hover:border-kast-teal/60 hover:bg-kast-teal/10"
+          >
+            <div className="flex flex-col items-center gap-5">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-kast-teal/40 bg-kast-teal/10 text-kast-teal">
+                <PlayCircle className="h-9 w-9" />
+              </div>
+              <div className="space-y-3">
+                <p className="text-[28px] md:text-[36px] font-bold tracking-tight text-white group-hover:text-kast-teal transition-colors">
+                  Open YouTube Demo
+                </p>
+                <p className="text-[15px] md:text-[18px] font-medium text-gray-400">
+                  https://www.youtube.com/watch?v=_hthqs5I7Xs
+                </p>
+              </div>
+            </div>
           </a>
         </div>
       </div>
