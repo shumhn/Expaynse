@@ -515,7 +515,7 @@ const slides = [
           </div>
 
           <a
-            href="https://www.youtube.com/watch?v=_hthqs5I7Xs"
+            href="https://www.youtube.com/watch?v=EFAKB6muRYg"
             target="_blank"
             rel="noopener noreferrer"
             className="group w-full max-w-3xl rounded-[32px] border border-kast-teal/30 bg-gradient-to-br from-kast-teal/10 via-zinc-950 to-zinc-950 px-8 py-12 shadow-[0_0_80px_rgba(30,186,152,0.08)] transition-all hover:border-kast-teal/60 hover:bg-kast-teal/10"
@@ -529,7 +529,7 @@ const slides = [
                   Open YouTube Demo
                 </p>
                 <p className="text-[15px] md:text-[18px] font-medium text-gray-400">
-                  https://www.youtube.com/watch?v=_hthqs5I7Xs
+                  https://www.youtube.com/watch?v=EFAKB6muRYg
                 </p>
               </div>
             </div>
