@@ -1028,10 +1028,6 @@ export default function DashboardPage() {
         onClose={() => setSetupOpen(false)}
         onSuccess={() => {
           void loadDashboard();
-          if (typeof window !== "undefined") {
-            window.sessionStorage.setItem(PEOPLE_ONBOARDING_HANDOFF_KEY, "1");
-          }
-          router.push("/people");
         }}
       />
       <InteractiveGuide
