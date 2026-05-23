@@ -38,6 +38,7 @@ import {
   AlertTriangle,
   PauseCircle,
   XCircle,
+  Play,
 } from "lucide-react";
 import Link from "next/link";
 import { EmployerLayout } from "@/components/employer-layout";
@@ -3584,9 +3585,9 @@ function EmployerPageContent() {
                           key={employee.id}
                           className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_32%),linear-gradient(180deg,rgba(14,14,16,0.98),rgba(8,8,9,1))] shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
                         >
-                          <div className="flex flex-col gap-4 px-6 pt-6 pb-5 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex flex-col gap-3 px-6 pt-5 pb-4 sm:flex-row sm:items-start sm:justify-between">
                             <div className="flex min-w-0 items-start gap-4">
-                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm font-bold text-white shadow-inner">
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm font-bold text-white shadow-inner">
                                 {employee.name?.charAt(0)?.toUpperCase() ?? "?"}
                               </div>
                               <div className="min-w-0">
@@ -3686,10 +3687,10 @@ function EmployerPageContent() {
 
                           <div className="mx-6 h-px bg-white/5" />
 
-                          <div className="flex flex-col items-center justify-center px-6 py-12">
+                          <div className="flex flex-col items-center justify-center px-6 py-6">
                             {/* Hero Dashboard */}
-                            <div className="text-center mb-8">
-                              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#a8a8aa] mb-5 shadow-sm">
+                            <div className="text-center mb-5">
+                              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#a8a8aa] mb-4 shadow-sm">
                                 {effectiveStatus === "active" ? (
                                   <>
                                     <span className="relative flex h-2 w-2">
@@ -3710,7 +3711,7 @@ function EmployerPageContent() {
                                   </>
                                 )}
                               </div>
-                              <h2 className="text-[3.5rem] font-black text-white tracking-tighter leading-none mb-3 font-mono">
+                              <h2 className="text-6xl font-black text-white tracking-tighter leading-none mb-2 font-mono">
                                 {preview ? formatMicroUsdc(preview.state.accruedUnpaidMicro) : "0.000000"}
                               </h2>
                               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#8f8f95]">
@@ -3719,7 +3720,7 @@ function EmployerPageContent() {
                             </div>
 
                             {/* Massive Media Controls */}
-                            <div className="flex items-center justify-center gap-6 mb-12">
+                            <div className="flex items-center justify-center gap-6 mb-6">
                               {/* Pause Button */}
                               <button
                                 onClick={() => stream && handleControlStream(stream, "pause")}
@@ -3761,7 +3762,7 @@ function EmployerPageContent() {
                                 {savingStream === employee.id || restartingStream === stream?.id || onboardingStream === stream?.id || (controllingStream === stream?.id && effectiveStatus !== "active") ? (
                                   <Loader2 size={36} className="animate-spin text-black/50" />
                                 ) : (
-                                  <PlayCircle size={44} fill="currentColor" className="ml-1.5 opacity-90" />
+                                  <Play size={40} fill="currentColor" className="ml-1 opacity-90" />
                                 )}
                               </button>
 
@@ -3782,21 +3783,21 @@ function EmployerPageContent() {
 
                             {/* Secondary Stats Grid */}
                             <div className="grid w-full grid-cols-2 md:grid-cols-4 gap-3">
-                              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center hover:bg-white/[0.04] transition-colors">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-1">Rate / Sec</p>
-                                <p className="text-sm font-mono font-bold text-white">{stream ? stream.ratePerSecond.toFixed(8) : "0.0000"} USDC</p>
+                              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-center hover:bg-white/[0.04] transition-colors">
+                                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-0.5">Rate / Sec</p>
+                                <p className="text-xs font-mono font-bold text-white">{stream ? stream.ratePerSecond.toFixed(8) : "0.0000"} USDC</p>
                               </div>
-                              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center hover:bg-white/[0.04] transition-colors">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-1">Monthly Salary</p>
-                                <p className="text-sm font-bold text-emerald-300">{formatUsd(employee.monthlySalaryUsd ?? ratePerSecondToMonthlyUsd(stream?.ratePerSecond ?? 0))}</p>
+                              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-center hover:bg-white/[0.04] transition-colors">
+                                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-0.5">Monthly Salary</p>
+                                <p className="text-xs font-bold text-emerald-300">{formatUsd(employee.monthlySalaryUsd ?? ratePerSecondToMonthlyUsd(stream?.ratePerSecond ?? 0))}</p>
                               </div>
-                              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center hover:bg-white/[0.04] transition-colors">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-1">Total Paid</p>
-                                <p className="text-sm font-mono font-bold text-white">{preview ? formatMicroUsdc(preview.state.totalPaidPrivateMicro) : "0.000000"} USDC</p>
+                              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-center hover:bg-white/[0.04] transition-colors">
+                                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-0.5">Total Paid</p>
+                                <p className="text-xs font-mono font-bold text-white">{preview ? formatMicroUsdc(preview.state.totalPaidPrivateMicro) : "0.000000"} USDC</p>
                               </div>
-                              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-center hover:bg-white/[0.04] transition-colors">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-1">Claimable Now</p>
-                                <p className="text-sm font-mono font-bold text-white">{preview ? formatMicroUsdc(preview.state.effectiveClaimableAmountMicro) : "0.000000"} USDC</p>
+                              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-center hover:bg-white/[0.04] transition-colors">
+                                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#8f8f95] mb-0.5">Claimable Now</p>
+                                <p className="text-xs font-mono font-bold text-white">{preview ? formatMicroUsdc(preview.state.effectiveClaimableAmountMicro) : "0.000000"} USDC</p>
                               </div>
                             </div>
                           </div>
@@ -4067,37 +4068,47 @@ function EmployerPageContent() {
                               </>
                             )}
 
-                            {effectiveStatus !== "stopped" ? (
+                            {effectiveStatus !== "stopped" && stream && !isOnboarded ? (
                               <button
-                                onClick={() =>
-                                  stream && handleOnboardToPer(stream)
-                                }
-                                disabled={
-                                  !walletAddress ||
-                                  onboardingStream === stream?.id ||
-                                  isOnboarded ||
-                                  !stream
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-2xl border border-white/10 bg-[#0f0f10] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white transition-all hover:bg-black disabled:opacity-60 shadow-sm"
+                                onClick={() => handleOnboardToPer(stream)}
+                                disabled={!walletAddress || onboardingStream === stream.id}
+                                className={`inline-flex items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-60 relative z-50 bg-emerald-500 border-emerald-400 text-black hover:bg-emerald-400 scale-105 shadow-[0_0_0_9999px_rgba(0,0,0,0.85),0_0_40px_rgba(16,185,129,0.8)] ring-2 ring-emerald-400 ring-offset-4 ring-offset-[#0a0a0a] animate-pulse hover:animate-none`}
                               >
-                                {onboardingStream === stream?.id ? (
+                                {onboardingStream === stream.id ? (
                                   <Loader2 size={13} className="animate-spin" />
                                 ) : (
                                   <Sparkles size={13} />
                                 )}
-                                {isOnboarded ? "PER Onboarded" : "Onboard PER"}
+                                {onboardingStream === stream.id ? "Onboarding to PER..." : "Onboard PER"}
+                              </button>
+                            ) : effectiveStatus === "active" && stream && isOnboarded && stream.checkpointCrankStatus !== "active" ? (
+                              <button
+                                onClick={() => handleCheckpointCrank(stream, "schedule")}
+                                disabled={!walletAddress || checkpointingStream === stream.id}
+                                className={`inline-flex items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-60 relative z-50 bg-blue-500 border-blue-400 text-white hover:bg-blue-400 scale-105 shadow-[0_0_0_9999px_rgba(0,0,0,0.85),0_0_40px_rgba(59,130,246,0.8)] ring-2 ring-blue-400 ring-offset-4 ring-offset-[#0a0a0a] animate-pulse hover:animate-none`}
+                              >
+                                {checkpointingStream === stream.id ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <RefreshCw size={13} />
+                                )}
+                                {checkpointingStream === stream.id ? "Starting Sync..." : "Start Sync Engine"}
                               </button>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 rounded-2xl border border-white/10 bg-[#0f0f10] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm">
+                              <span className={`inline-flex items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider shadow-sm ${
+                                isOnboarded 
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                  : "border-white/10 bg-[#0f0f10] text-[#8f8f95]"
+                              }`}>
                                 <Sparkles size={13} />
-                                PER Onboarded
+                                {isOnboarded ? "PER Onboarded" : "No PER State"}
                               </span>
                             )}
 
 
 
                             {/* Advanced Engine Controls */}
-                            <div className="mt-8 px-6 pb-6">
+                            <div className="mt-5 px-6 pb-5">
                               <details className="group">
                                 <summary className="flex cursor-pointer items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#8f8f95] transition-colors hover:text-white list-none">
                                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5 transition-transform group-open:rotate-90">
