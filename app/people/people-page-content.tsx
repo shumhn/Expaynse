@@ -40,6 +40,7 @@ import {
   type PayrollMode,
 } from "@/lib/payroll-mode";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   InteractiveGuide,
   type GuideStep,
@@ -131,6 +132,50 @@ function formatCurrency(amount: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function toIsoDateInput(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function addDaysIsoDate(isoDate: string, days: number) {
+  const base = new Date(`${isoDate}T00:00:00.000Z`);
+  if (!Number.isFinite(base.getTime())) {
+    return isoDate;
+  }
+  base.setUTCDate(base.getUTCDate() + days);
+  return toIsoDateInput(base);
+}
+
+function toRangeStartIso(isoDate: string) {
+  return new Date(`${isoDate}T00:00:00.000Z`).toISOString();
+}
+
+function toRangeEndIso(isoDate: string) {
+  return new Date(`${isoDate}T23:59:59.999Z`).toISOString();
+}
+
+function getRangeDurationSeconds(startDate: string, endDate: string) {
+  if (!startDate || !endDate) return 0;
+  const startsAt = new Date(`${startDate}T00:00:00.000Z`);
+  const endsAt = new Date(`${endDate}T23:59:59.999Z`);
+  if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime())) {
+    return 0;
+  }
+  const duration = Math.floor((endsAt.getTime() - startsAt.getTime()) / 1000);
+  return Math.max(0, duration);
+}
+
+function calcRatePerSecondForRange(args: {
+  amountUsd: number;
+  startDate: string;
+  endDate: string;
+}) {
+  const { amountUsd, startDate, endDate } = args;
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) return 0;
+  const durationSeconds = getRangeDurationSeconds(startDate, endDate);
+  if (durationSeconds <= 0) return 0;
+  return amountUsd / durationSeconds;
 }
 
 function getPrivateInitStatus(employee: Employee, stream: StreamInfo | null) {
@@ -231,7 +276,7 @@ const PAYROLL_MODE_GUIDE_STEPS: GuideStep[] = [
 
 const PAYROLL_MODE_CTA_LABEL: Record<PayrollMode, string> = {
   private_payroll: "Add Employee",
-  streaming: "Add Employee & Start Stream",
+  streaming: "Add Employee",
 };
 
 function isFreshPrivatePreview(
@@ -276,6 +321,7 @@ function getLiveAccrued(preview?: PrivatePayrollStateResponse | null) {
 
 export default function PeoplePage() {
   const { publicKey, signMessage } = useWallet();
+  const router = useRouter();
   const walletAddr = publicKey?.toBase58();
   const payrollGuideScope = walletAddr || "guest";
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -325,6 +371,8 @@ export default function PeoplePage() {
   });
   const [streamModalEmployee, setStreamModalEmployee] = useState<Employee | null>(null);
   const [streamSalaryInput, setStreamSalaryInput] = useState("");
+  const [streamStartDate, setStreamStartDate] = useState("");
+  const [streamEndDate, setStreamEndDate] = useState("");
   const [startingStream, setStartingStream] = useState(false);
 
   // Keep a local clock so live accrued values update without a server round trip.
@@ -693,7 +741,6 @@ export default function PeoplePage() {
   const getStream = (empId: string) =>
     streams.find((s) => s.employeeId === empId);
   const parsedAmount = Number.parseFloat(newCompensationAmount || "0");
-  const startDateTimeIso = new Date().toISOString();
   const previewRatePerSecond = monthlyUsdToRatePerSecond(parsedAmount);
   const selectedPayrollModeCtaLabel = PAYROLL_MODE_CTA_LABEL[newPayrollMode];
 
@@ -794,21 +841,29 @@ export default function PeoplePage() {
     [signMessage, walletAddr],
   );
 
-  const handleStartStream = async (employee: Employee, monthlySalary: number) => {
+  const handleStartStream = async (
+    employee: Employee,
+    monthlySalary: number,
+    startDate: string,
+    endDate: string,
+  ) => {
     if (!walletAddr || !signMessage) return;
 
     setStartingStream(true);
     try {
-      const ratePerSecond = monthlyUsdToRatePerSecond(monthlySalary);
+      const ratePerSecond = calcRatePerSecondForRange({
+        amountUsd: monthlySalary,
+        startDate,
+        endDate,
+      });
           
       if (ratePerSecond <= 0) {
-        toast.error("Monthly salary must be a positive number.");
+        toast.error("Set a valid salary and date range.");
         return;
       }
 
-      const startDateTimeIso = newStartDate 
-        ? new Date(newStartDate).toISOString() 
-        : new Date().toISOString();
+      const startDateTimeIso = toRangeStartIso(startDate);
+      const endDateTimeIso = toRangeEndIso(endDate);
 
       // Persist streaming mode first so downstream flows (stream creation, UI state)
       // use a single canonical payroll mode.
@@ -843,6 +898,7 @@ export default function PeoplePage() {
           employeeId: employee.id,
           ratePerSecond,
           startsAt: startDateTimeIso,
+          endsAt: endDateTimeIso,
           status: "active",
           payoutMode: DEFAULT_PAYROLL_PAYOUT_MODE,
           allowedPayoutModes: allowedPayoutModesFor(),
@@ -853,6 +909,7 @@ export default function PeoplePage() {
             compensationAmountUsd: monthlySalary,
             monthlySalaryUsd: monthlySalary,
             startsAt: startDateTimeIso,
+            endsAt: endDateTimeIso,
           },
         },
       });
@@ -864,10 +921,15 @@ export default function PeoplePage() {
 
       if (streamJson.stream) {
         setStreams((prev) => [streamJson.stream, ...prev]);
-        toast.success(`Stream started for ${employee.name} at $${monthlySalary.toFixed(2)}/month`);
+        toast.success(
+          `Stream started for ${employee.name} with $${monthlySalary.toFixed(2)} over selected range.`,
+        );
       }
 
       setStreamModalEmployee(null);
+      setStreamStartDate("");
+      setStreamEndDate("");
+      router.push(`/disburse?employee=${employee.id}`);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to start stream");
     } finally {
@@ -886,11 +948,11 @@ export default function PeoplePage() {
     ) {
       return;
     }
+
+    const isStreamingMode = newPayrollMode !== "private_payroll";
+
     setAdding(true);
-    
-    const startDateTimeIso = newStartDate 
-      ? new Date(newStartDate).toISOString() 
-      : new Date().toISOString();
+    const employeeStartDateIso = new Date().toISOString();
       
     try {
       const employeeRes = await walletAuthenticatedFetch({
@@ -910,7 +972,7 @@ export default function PeoplePage() {
           compensationUnit: "monthly",
           compensationAmountUsd: parsedAmount,
           monthlySalaryUsd: parsedAmount,
-          startDate: startDateTimeIso,
+          startDate: employeeStartDateIso,
         },
       });
       const employeeJson = await employeeRes.json();
@@ -929,40 +991,6 @@ export default function PeoplePage() {
             showFailureToast: false,
           })) ?? employee;
       }
-      if (employee.payrollMode !== "private_payroll") {
-        const shouldStartImmediately = new Date(startDateTimeIso).getTime() <= now;
-        const streamRes = await walletAuthenticatedFetch({
-          wallet: walletAddr,
-          signMessage,
-          path: "/api/streams",
-          method: "POST",
-          body: {
-            employerWallet: walletAddr,
-            employeeId: employee.id,
-            ratePerSecond: previewRatePerSecond,
-            startsAt: startDateTimeIso,
-            status: shouldStartImmediately ? "active" : "paused",
-            payoutMode: newPayoutMode,
-            allowedPayoutModes: allowedPayoutModesFor(),
-            compensationSnapshot: {
-              employmentType: "full_time",
-              paySchedule: "monthly",
-              compensationUnit: "monthly",
-              compensationAmountUsd: parsedAmount,
-              monthlySalaryUsd: parsedAmount,
-              startsAt: startDateTimeIso,
-            },
-          },
-        });
-        const streamJson = await streamRes.json();
-
-        if (streamRes.ok && streamJson.stream) {
-          setStreams((prev) => [streamJson.stream, ...prev]);
-        } else {
-          toast.warning("Employee added, but stream setup needs attention");
-        }
-      }
-
       setEmployees((prev) => [employee, ...prev]);
 
       setShowAdd(false);
@@ -973,6 +1001,8 @@ export default function PeoplePage() {
       setNewCompensationAmount("");
       setNewPayrollMode("streaming");
       setNewPayoutMode(DEFAULT_PAYROLL_PAYOUT_MODE);
+      setNewStartDate("");
+      setNewEndDate("");
       if (employee.payrollMode === "private_payroll") {
         if (employee.privateRecipientInitStatus === "confirmed") {
           toast.success("Employee added and private payroll is ready.");
@@ -981,18 +1011,15 @@ export default function PeoplePage() {
             "Employee added in private payroll mode. Private setup can finish from the employer flow if needed.",
           );
         }
-      } else if (employee.privateRecipientInitStatus === "confirmed") {
-        toast.success("Employee added and private init completed.");
-      } else if (employee.privateRecipientInitStatus === "failed") {
-        toast.warning(
-          employee.privateRecipientInitError
-            ? `Employee added, but private init failed: ${employee.privateRecipientInitError}. Ask the employee to open Claim > Withdraw and initialize their private account.`
-            : "Employee added, but private init failed. Ask the employee to open Claim > Withdraw and initialize their private account.",
-        );
       } else {
-        toast.success(
-          "Employee added. Auto-init is syncing; if it does not finish, the employee can self-initialize from Claim > Withdraw.",
-        );
+        const todayIso = toIsoDateInput(new Date());
+        const defaultSalary =
+          employee.monthlySalaryUsd ?? employee.compensationAmountUsd ?? parsedAmount;
+        setStreamSalaryInput(defaultSalary > 0 ? String(defaultSalary) : "");
+        setStreamStartDate(todayIso);
+        setStreamEndDate(addDaysIsoDate(todayIso, 30));
+        setStreamModalEmployee(employee);
+        toast.success("Employee added. Set the stream range to go live.");
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to add");
@@ -1367,7 +1394,14 @@ export default function PeoplePage() {
                         <button
                           onClick={() => {
                             const defaultSalary = emp.monthlySalaryUsd ?? emp.compensationAmountUsd ?? 0;
+                            const todayIso = toIsoDateInput(new Date());
+                            const defaultStart =
+                              newStartDate ||
+                              (emp.startDate ? emp.startDate.slice(0, 10) : todayIso);
+                            const defaultEnd = newEndDate || addDaysIsoDate(defaultStart, 30);
                             setStreamSalaryInput(defaultSalary > 0 ? defaultSalary.toString() : "");
+                            setStreamStartDate(defaultStart);
+                            setStreamEndDate(defaultEnd);
                             setStreamModalEmployee(emp);
                           }}
                           disabled={!signMessage}
@@ -1574,19 +1608,6 @@ export default function PeoplePage() {
                   </div>
                 </div>
               </div>
-              {newPayrollMode !== "private_payroll" && (
-                <div>
-                  <label className="text-[11px] font-bold text-[#8f8f95] uppercase tracking-wider mb-1.5 block">
-                    Stream starts at
-                  </label>
-                  <DateRangeCalendarPicker
-                    startDate={newStartDate}
-                    endDate={newEndDate}
-                    onStartChange={setNewStartDate}
-                    onEndChange={setNewEndDate}
-                  />
-                </div>
-              )}
             </div>
 
             <button
@@ -1623,7 +1644,13 @@ export default function PeoplePage() {
       {streamModalEmployee && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          onClick={() => { if (!startingStream) setStreamModalEmployee(null); }}
+          onClick={() => {
+            if (!startingStream) {
+              setStreamModalEmployee(null);
+              setStreamStartDate("");
+              setStreamEndDate("");
+            }
+          }}
         >
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
           <div
@@ -1668,17 +1695,41 @@ export default function PeoplePage() {
                     autoFocus
                   />
                 </div>
-                {parseFloat(streamSalaryInput) > 0 && (
+                {parseFloat(streamSalaryInput) > 0 && streamStartDate && streamEndDate && (
                   <p className="mt-2 text-xs text-[#8f8f95]">
-                    Rate: <span className="text-white font-mono">${(monthlyUsdToRatePerSecond(parseFloat(streamSalaryInput)) * 86400).toFixed(6)}</span> USDC/day
+                    Stream rate:{" "}
+                    <span className="text-white font-mono">
+                      {calcRatePerSecondForRange({
+                        amountUsd: parseFloat(streamSalaryInput),
+                        startDate: streamStartDate,
+                        endDate: streamEndDate,
+                      }).toFixed(8)}
+                    </span>{" "}
+                    USDC/sec
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-[#8f8f95] mb-2">
+                  Payroll calendar range
+                </label>
+                <DateRangeCalendarPicker
+                  startDate={streamStartDate}
+                  endDate={streamEndDate}
+                  onStartChange={setStreamStartDate}
+                  onEndChange={setStreamEndDate}
+                />
               </div>
             </div>
 
             <div className="mt-8 flex gap-3">
               <button
-                onClick={() => setStreamModalEmployee(null)}
+                onClick={() => {
+                  setStreamModalEmployee(null);
+                  setStreamStartDate("");
+                  setStreamEndDate("");
+                }}
                 disabled={startingStream}
                 className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-[#8f8f95] hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40"
               >
@@ -1691,9 +1742,23 @@ export default function PeoplePage() {
                     toast.error("Enter a valid monthly salary");
                     return;
                   }
-                  void handleStartStream(streamModalEmployee, salary);
+                  if (!streamStartDate || !streamEndDate) {
+                    toast.error("Select stream start and end dates.");
+                    return;
+                  }
+                  void handleStartStream(
+                    streamModalEmployee,
+                    salary,
+                    streamStartDate,
+                    streamEndDate,
+                  );
                 }}
-                disabled={startingStream || !parseFloat(streamSalaryInput)}
+                disabled={
+                  startingStream ||
+                  !parseFloat(streamSalaryInput) ||
+                  !streamStartDate ||
+                  !streamEndDate
+                }
                 className="flex-1 rounded-xl bg-[#1eba98] py-3 text-sm font-bold text-black hover:bg-[#1eba98]/80 transition-colors disabled:opacity-40 shadow-[0_0_20px_rgba(30,186,152,0.25)] flex items-center justify-center gap-2"
               >
                 {startingStream ? (

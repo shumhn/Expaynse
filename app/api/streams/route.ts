@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
       ratePerSecond?: number;
       status?: PayrollStreamStatus;
       startsAt?: string | null;
+      endsAt?: string | null;
       payoutMode?: PayrollPayoutMode;
       allowedPayoutModes?: PayrollPayoutMode[];
       compensationSnapshot?: {
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
         weeklyHours?: number;
         monthlySalaryUsd?: number;
         startsAt?: string | null;
+        endsAt?: string | null;
       };
     };
 
@@ -144,6 +146,7 @@ export async function POST(request: NextRequest) {
       ratePerSecond: body.ratePerSecond,
       status: body.status,
       startsAt: body.startsAt,
+      endsAt: body.endsAt,
       payoutMode: body.payoutMode,
       allowedPayoutModes: body.allowedPayoutModes,
       compensationSnapshot: body.compensationSnapshot,
