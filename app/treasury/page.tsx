@@ -578,7 +578,7 @@ function TreasuryPageContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <div className="rounded-3xl border border-white/10 bg-[#0a0a0a] p-5 shadow-sm relative overflow-hidden">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a8a8aa]">Total Payouts</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight text-white">{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC</p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-white">{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDC</p>
             <p className="mt-1 text-xs text-[#a8a8aa]">All-time streaming + private transfer volume</p>
             <div className="absolute top-5 right-5 text-[#8f8f95]">
               <ArrowUpRight size={20} />
@@ -587,7 +587,7 @@ function TreasuryPageContent() {
 
           <div className="rounded-3xl border border-white/10 bg-[#0a0a0a] p-5 shadow-sm relative overflow-hidden">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a8a8aa]">Total Deposited</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight text-white">{trackedDeposited.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC</p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-white">{trackedDeposited.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDC</p>
             <p className="mt-1 text-xs text-[#a8a8aa]">Funds added to private vault (verified tx history)</p>
             <div className="absolute top-5 right-5 text-[#1eba98]">
               <ArrowDownLeft size={20} />

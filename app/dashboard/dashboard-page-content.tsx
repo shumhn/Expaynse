@@ -168,7 +168,7 @@ function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 6,
   }).format(Number.isFinite(value) ? value : 0);
 }
 
