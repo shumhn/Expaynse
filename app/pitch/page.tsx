@@ -1,15 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
   ChevronLeft, ChevronRight, Zap, Shield, Globe,
   CheckCircle, DollarSign, Check, X
 } from "lucide-react";
 
-const ease = [0.16, 1, 0.3, 1] as const;
-const fadeUp = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } };
 const card = "rounded-2xl p-6 bg-zinc-900/40 border border-white/20 hover:border-white/30 hover:bg-zinc-900/60 transition-all shadow-xl";
 
 const slides = [
@@ -20,35 +17,24 @@ const slides = [
         <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[800px] h-[800px] bg-kast-teal/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="max-w-7xl grid lg:grid-cols-2 gap-16 items-center w-full mx-auto">
           <div className="flex flex-col gap-6 z-10">
-            <motion.span
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 1, ease }}
+            <span
               className="text-kast-teal text-lg font-semibold tracking-widest uppercase"
             >
               Introducing
-            </motion.span>
-            <motion.h1
-              {...fadeUp}
-              transition={{ duration: 1, ease }}
+            </span>
+            <h1
               className="text-[36px] md:text-[52px] font-medium tracking-tight leading-[1.2] text-white"
             >
               A Real Time{" "}
               <span className="text-kast-teal">Private</span> Payroll.
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4, duration: 1, ease }}
+            </h1>
+            <p
               className="text-2xl md:text-3xl text-gray-400 max-w-2xl leading-relaxed"
             >
               Instant payment and confidential settlement.
-            </motion.p>
+            </p>
           </div>
-          <motion.div
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3, duration: 1, ease }}
+          <div
             className="flex items-center justify-center"
           >
             <div className="relative w-[320px] h-auto overflow-hidden bg-black z-20 shadow-[0_0_100px_-20px_rgba(30,186,152,0.25)] rounded-[2.5rem]">
@@ -61,7 +47,7 @@ const slides = [
                 priority
               />
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     ),
@@ -71,28 +57,21 @@ const slides = [
     content: (
       <div className="relative flex flex-col items-center justify-center h-full text-center max-w-5xl mx-auto px-6 overflow-hidden">
         {/* Removed the noisy radial gradient so it stays pure dark like the screenshot */}
-        <motion.p
-          initial={{ opacity: 0, y: -18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease }}
+        <p
           className="relative z-10 mb-8 text-kast-teal text-base md:text-[22px] font-semibold tracking-[0.35em] uppercase"
         >
           Because
-        </motion.p>
-        <motion.h1
-          {...fadeUp}
-          transition={{ delay: 0.15, duration: 1, ease }}
+        </p>
+        <h1
           className="relative z-10 text-[42px] md:text-[68px] lg:text-[78px] font-medium tracking-tight text-white mb-8 leading-[1.1] max-w-5xl text-balance"
         >
           Salaries were never meant to be <span className="text-kast-teal">public on chain</span>.
-        </motion.h1>
-        <motion.p
-          {...fadeUp}
-          transition={{ delay: 0.38, duration: 1, ease }}
+        </h1>
+        <p
           className="relative z-10 text-[18px] md:text-[28px] text-gray-400 leading-[1.4] max-w-3xl text-balance"
         >
           Payroll should be private — whether paid monthly or streamed every second.
-        </motion.p>
+        </p>
       </div>
     ),
   },
@@ -100,10 +79,10 @@ const slides = [
     id: "problems",
     content: (
       <div className="flex flex-col h-full justify-center max-w-6xl mx-auto px-6 w-full">
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-12">
+        <div className="text-center mb-12">
           <p className="text-kast-teal text-sm font-semibold tracking-wide uppercase mb-4">The Challenge</p>
           <h2 className="text-[40px] md:text-[52px] font-medium text-white tracking-tight">Problems</h2>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-6">
           {[
@@ -111,7 +90,7 @@ const slides = [
             { tag: "PRIVACY", stat: "80%", desc: "of 755 employees preferred to hide salary information from coworkers.", source: "UCLA / Harvard Business School" },
             { tag: "ADOPTION", stat: "Adoption blocker", desc: "Companies want faster payroll on-chain, but public balance, salary, and burn-rate visibility makes it nearly impossible to adopt." },
           ].map((c, i) => (
-            <motion.div key={i} {...fadeUp} transition={{ delay: i * 0.12, duration: 0.8, ease }} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-8 shadow-xl flex flex-col relative">
+            <div key={i} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-8 shadow-xl flex flex-col relative">
               <p className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.25em] mb-4">{c.tag}</p>
               <p className="text-[36px] font-bold tracking-tight text-kast-teal mb-4 whitespace-nowrap">{c.stat}</p>
               <p className="text-[18px] font-bold text-white/95 leading-[1.6] flex-grow">{c.desc}</p>
@@ -120,16 +99,16 @@ const slides = [
                   SOURCE: {c.source}
                 </p>
               )}
-            </motion.div>
+            </div>
           ))}
         </div>
 
-        <motion.div {...fadeUp} transition={{ delay: 0.4, duration: 0.8, ease }} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-7 px-8 w-full shadow-xl">
+        <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-7 px-8 w-full shadow-xl">
           <p className="text-[22px] font-bold text-white flex justify-between items-center">
             <span>Solving these problems unlocks a <span className="text-kast-teal">$13 Trillion</span> payroll market.</span>
             <span className="text-[12px] font-bold text-gray-500 uppercase tracking-widest">SOURCE: FRED / BEA</span>
           </p>
-        </motion.div>
+        </div>
       </div>
     ),
   },
@@ -137,10 +116,10 @@ const slides = [
     id: "solution",
     content: (
       <div className="flex flex-col h-full justify-center max-w-7xl mx-auto px-6 w-full">
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-14">
+        <div className="text-center mb-14">
           <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-5">The Solution</p>
           <h2 className="text-[36px] md:text-[44px] font-medium text-white tracking-tight">Private Payroll with Two Payout Modes</h2>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-3 gap-6 mt-6">
           {[
@@ -160,7 +139,7 @@ const slides = [
               bullets: ["Hidden compensation.", "Protected team data.", "Clean reporting."]
             }
           ].map((c, i) => (
-            <motion.div key={i} {...fadeUp} transition={{ delay: i * 0.12, duration: 0.8, ease }} className="bg-zinc-900/40 border border-white/20 rounded-2xl p-8 shadow-xl flex flex-col justify-start min-h-[220px]">
+            <div key={i} className="bg-zinc-900/40 border border-white/20 rounded-2xl p-8 shadow-xl flex flex-col justify-start min-h-[220px]">
               <p className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.3em] mb-6">{c.tag}</p>
               <p className="text-[28px] xl:text-[32px] font-bold tracking-tight text-kast-teal mb-8 whitespace-nowrap">{c.title}</p>
               <div className="flex flex-col gap-4">
@@ -168,7 +147,7 @@ const slides = [
                   <p key={idx} className="text-[18px] lg:text-[20px] font-bold text-white/95">{bullet}</p>
                 ))}
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
@@ -236,20 +215,18 @@ const slides = [
           </div>
         </div>
 
-        <motion.div
-          {...fadeUp}
-          transition={{ duration: 0.9, ease }}
+        <div
           className="relative hidden aspect-video w-full max-w-[1540px] overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.55)] md:block"
         >
           <Image
-            src="/pitch-architecture-expaynse.svg?v=7"
+            src="/pitch-architecture-expaynse.svg?v=8"
             alt="Expaynse architecture overview showing private payout and real-time private streaming modes"
             fill
             priority
             unoptimized
             className="object-contain"
           />
-        </motion.div>
+        </div>
       </div>
     ),
   },
@@ -257,10 +234,10 @@ const slides = [
     id: "market-opportunity",
     content: (
       <div className="flex flex-col h-full justify-center max-w-7xl mx-auto px-6 w-full">
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-14">
+        <div className="text-center mb-14">
           <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-5">The Opportunity</p>
           <h2 className="text-[44px] md:text-[50px] font-medium text-white tracking-tight">Market Opportunity</h2>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-10">
           {[
@@ -268,17 +245,17 @@ const slides = [
             { tag: "RAIL", stat: "90%+", desc: "of crypto payroll is paid in USDC/USDT." },
             { tag: "VOLUME", stat: "$226B", desc: "B2B stablecoin payment volume in 2025." },
           ].map((c, i) => (
-            <motion.div key={i} {...fadeUp} transition={{ delay: i * 0.12, duration: 0.8, ease }} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-8 shadow-xl flex flex-col relative min-h-[220px]">
+            <div key={i} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-8 shadow-xl flex flex-col relative min-h-[220px]">
               <p className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.3em] mb-5">{c.tag}</p>
               <p className="text-[44px] md:text-[50px] font-bold tracking-tight text-kast-teal mb-5">{c.stat}</p>
               <p className="text-[18px] font-bold text-white/95 leading-[1.6] flex-grow">{c.desc}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
         
-        <motion.p {...fadeUp} transition={{ delay: 0.4, duration: 0.8, ease }} className="text-[11px] font-bold text-gray-500 uppercase tracking-widest text-center mt-4">
+        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest text-center mt-4">
           SOURCES: RISEWORKS 2025 / BINANCE RESEARCH / ALPHAPOINT / MCKINSEY / JUNIPER RESEARCH
-        </motion.p>
+        </p>
       </div>
     ),
   },
@@ -286,10 +263,10 @@ const slides = [
     id: "target-markets",
     content: (
       <div className="flex flex-col h-full justify-center max-w-6xl mx-auto px-6 w-full">
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-14">
+        <div className="text-center mb-14">
           <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-5">WHO IT IS FOR</p>
           <h2 className="text-[44px] md:text-[50px] font-medium text-white tracking-tight">Target Markets</h2>
-        </motion.div>
+        </div>
         <div className="grid md:grid-cols-2 gap-6">
           {[
             { icon: DollarSign, text: "Companies paying teams in StableCoins" },
@@ -297,12 +274,12 @@ const slides = [
             { icon: Zap, text: "Crypto-native teams with remote workforces" },
             { icon: Shield, text: "Companies wanting on-chain payroll with compensation privacy" },
           ].map((item, idx) => (
-            <motion.div key={idx} {...fadeUp} transition={{ delay: idx * 0.12, duration: 0.8, ease }} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-10 shadow-xl flex items-center gap-8 min-h-[160px]">
+            <div key={idx} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-10 shadow-xl flex items-center gap-8 min-h-[160px]">
               <div className="p-5 bg-kast-teal/10 rounded-2xl shrink-0">
                 <item.icon className="w-9 h-9 text-kast-teal" />
               </div>
               <p className="text-[18px] md:text-[20px] font-bold text-white/95 leading-relaxed">{item.text}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
@@ -312,12 +289,12 @@ const slides = [
     id: "competitive",
     content: (
       <div className="flex flex-col h-full justify-center max-w-7xl mx-auto px-6 w-full">
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-14">
+        <div className="text-center mb-14">
           <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-5">How we compare</p>
           <h2 className="text-[44px] md:text-[50px] font-medium text-white tracking-tight">Competitive Landscape</h2>
-        </motion.div>
+        </div>
         
-        <motion.div {...fadeUp} transition={{ delay: 0.2, duration: 0.8, ease }} className="w-full rounded-2xl bg-[#0c0c0c] border border-white/10 overflow-hidden shadow-2xl">
+        <div className="w-full rounded-2xl bg-[#0c0c0c] border border-white/10 overflow-hidden shadow-2xl">
           <div className="grid grid-cols-6 text-left border-b border-white/10 bg-[#0c0c0c] text-[12px] md:text-[13px] font-extrabold text-gray-200 uppercase tracking-widest divide-x divide-white/10 whitespace-nowrap">
             <div className="py-7 px-4 md:px-6 flex items-center">Company</div>
             <div className="py-7 px-4 md:px-6 flex items-center justify-center">Payroll Support</div>
@@ -365,7 +342,7 @@ const slides = [
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
       </div>
     ),
   },
@@ -373,12 +350,12 @@ const slides = [
     id: "business-model",
     content: (
       <div className="flex flex-col h-full justify-center max-w-5xl mx-auto px-6 w-full">
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-14">
+        <div className="text-center mb-14">
           <p className="text-kast-teal text-sm font-semibold tracking-wide uppercase mb-4">Revenue Streams</p>
           <h2 className="text-[40px] md:text-[52px] font-medium text-white tracking-tight">Business Model</h2>
-        </motion.div>
+        </div>
         <div className="grid md:grid-cols-2 gap-6">
-          <motion.div {...fadeUp} transition={{ delay: 0.1, duration: 0.8, ease }} className={`${card} p-10 flex flex-col items-center text-center`}>
+          <div className={`${card} p-10 flex flex-col items-center text-center`}>
             <p className="text-base text-kast-teal mb-5 font-bold uppercase tracking-[0.15em]">Recurring Revenue</p>
             <div className="text-6xl font-bold text-white mb-2 flex items-baseline justify-center">
               $99<span className="text-4xl text-gray-300 ml-3">– $499</span>
@@ -389,8 +366,8 @@ const slides = [
               <li className="flex items-center gap-4"><CheckCircle className="w-6 h-6 text-kast-teal shrink-0" /> Private Payroll Vaults</li>
               <li className="flex items-center gap-4"><CheckCircle className="w-6 h-6 text-kast-teal shrink-0" /> Advanced Reporting</li>
             </ul>
-          </motion.div>
-          <motion.div {...fadeUp} transition={{ delay: 0.25, duration: 0.8, ease }} className={`${card} p-10 flex flex-col items-center text-center`}>
+          </div>
+          <div className={`${card} p-10 flex flex-col items-center text-center`}>
             <p className="text-base text-kast-teal mb-5 font-bold uppercase tracking-[0.15em]">Active Worker Fee</p>
             <div className="text-6xl font-bold text-kast-teal mb-2 flex items-baseline justify-center">
               $3<span className="text-4xl text-kast-teal/90 ml-3">– $8</span>
@@ -401,7 +378,7 @@ const slides = [
               <li className="flex items-center gap-4"><CheckCircle className="w-6 h-6 text-kast-teal shrink-0" /> Claim Gas Subsidization</li>
               <li className="flex items-center gap-4"><CheckCircle className="w-6 h-6 text-kast-teal shrink-0" /> Payment History Verification</li>
             </ul>
-          </motion.div>
+          </div>
         </div>
       </div>
     ),
@@ -410,13 +387,13 @@ const slides = [
     id: "why-solana",
     content: (
       <div className="flex flex-col h-full justify-center max-w-6xl mx-auto px-6 w-full">
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-16">
+        <div className="text-center mb-16">
           <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-5">Infrastructure</p>
           <h2 className="text-[44px] md:text-[50px] font-medium text-white tracking-tight">
             Why <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#14F195] to-[#9945FF]">Solana</span>
           </h2>
           <p className="text-[18px] text-gray-300 max-w-2xl mx-auto mt-6 font-semibold">Solana already has the stablecoin payment activity needed for payroll.</p>
-        </motion.div>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           {[
@@ -424,18 +401,18 @@ const slides = [
             { value: "$200B", label: "Monthly transfers" },
             { value: "$15.4B", label: "Stablecoin market cap" },
           ].map((stat, idx) => (
-            <motion.div key={idx} {...fadeUp} transition={{ delay: idx * 0.1, duration: 0.8, ease }} className="bg-[#0c0c0c] border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center p-12 min-h-[200px] shadow-xl">
+            <div key={idx} className="bg-[#0c0c0c] border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center p-12 min-h-[200px] shadow-xl">
               <p className="text-[54px] font-bold text-kast-teal mb-4 leading-none tracking-tight">{stat.value}</p>
               <p className="text-[13px] font-bold text-gray-400 uppercase tracking-[0.15em]">{stat.label}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
         
-        <motion.div {...fadeUp} transition={{ delay: 0.5, duration: 0.8, ease }} className="rounded-full py-4 px-10 text-center mx-auto inline-block bg-[#0c0c0c] border border-white/10 shadow-xl">
+        <div className="rounded-full py-4 px-10 text-center mx-auto inline-block bg-[#0c0c0c] border border-white/10 shadow-xl">
           <p className="text-[15px] text-gray-400 font-medium">
             Trusted by <span className="text-white font-bold">PayPal</span>, <span className="text-white font-bold">Visa</span>, <span className="text-white font-bold">Western Union</span>, <span className="text-white font-bold">Worldpay</span>, and <span className="text-white font-bold">Fiserv</span>.
           </p>
-        </motion.div>
+        </div>
         
         <p className="text-[11px] text-gray-500 text-center mt-6 tracking-wide">Sources: CoinMarketCap, DLNews, CryptoRank, BLS QCEW 2024</p>
       </div>
@@ -445,11 +422,11 @@ const slides = [
     id: "team",
     content: (
       <div className="flex flex-col h-full justify-center max-w-7xl mx-auto px-6 w-full">
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="text-center mb-20">
+        <div className="text-center mb-20">
           <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-6">The team behind Expaynse</p>
           <h2 className="text-[44px] md:text-[50px] font-medium text-white tracking-tight">Team</h2>
           <p className="text-[18px] text-gray-300 mt-6 max-w-2xl mx-auto font-semibold leading-relaxed">Founder-led execution with the right mix: payments, product, operations, and marketing.</p>
-        </motion.div>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
@@ -463,7 +440,7 @@ const slides = [
             { 
               name: "Isha", 
               role: "Marketing Lead", 
-              desc: "Luminar Network marketer focused on cross-channel growth and community building.",
+              desc: "Growth marketer at Expaynse Protocol, building awareness, traction, and community.",
               image: "/isha.jpg", 
             },
             { 
@@ -479,7 +456,7 @@ const slides = [
               image: "/mohit.jpg",
             },
           ].map((member, idx) => (
-            <motion.div key={idx} {...fadeUp} transition={{ delay: idx * 0.1, duration: 0.8, ease }} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 md:p-8 flex flex-col text-left group shadow-xl">
+            <div key={idx} className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 md:p-8 flex flex-col text-left group shadow-xl">
               <div className="w-20 h-20 rounded-full mb-8 border border-white/10 overflow-hidden flex items-center justify-center bg-kast-teal/10 group-hover:border-kast-teal/40 transition-colors duration-500 shrink-0 relative">
                 <span className="text-[24px] font-bold text-white/80">{member.name[0]}</span>
                 {member.image && (
@@ -494,7 +471,7 @@ const slides = [
               <h3 className="text-[20px] md:text-[22px] font-bold text-white mb-1 group-hover:text-kast-teal transition-colors text-left w-full">{member.name}</h3>
               <p className="text-[11px] text-kast-teal font-bold tracking-[0.1em] uppercase mb-6 text-left w-full">{member.role}</p>
               <p className="text-[14px] md:text-[15px] text-gray-300 leading-[1.6] font-semibold text-left w-full">{member.desc}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
@@ -506,13 +483,13 @@ const slides = [
       <div className="flex flex-col h-full justify-between max-w-5xl mx-auto px-6 py-24 w-full text-center relative z-10">
         <div /> {/* Spacer to balance flex layout */}
         
-        <motion.div {...fadeUp} transition={{ duration: 1, ease }} className="-mt-12">
+        <div className="-mt-12">
           <p className="text-[12px] font-bold text-kast-teal tracking-[0.3em] uppercase mb-16">Find us on</p>
           <h2 className="text-[54px] md:text-[68px] font-bold text-white tracking-tight mb-8">expaynse.xyz</h2>
           <p className="text-[18px] md:text-[22px] text-gray-400 font-medium">Follow our journey on X.</p>
-        </motion.div>
+        </div>
         
-        <motion.div {...fadeUp} transition={{ delay: 0.2, duration: 1, ease }} className="flex justify-center items-center gap-6 text-[15px] md:text-[17px] font-medium tracking-wide">
+        <div className="flex justify-center items-center gap-6 text-[15px] md:text-[17px] font-medium tracking-wide">
           <a href="https://expaynse.xyz" target="_blank" rel="noopener noreferrer" className="text-white hover:text-kast-teal transition-colors">
             https://expaynse.xyz
           </a>
@@ -520,7 +497,7 @@ const slides = [
           <a href="https://x.com/expaynse" target="_blank" rel="noopener noreferrer" className="text-kast-teal hover:text-kast-teal/80 transition-colors">
             https://x.com/expaynse
           </a>
-        </motion.div>
+        </div>
       </div>
     ),
   },
@@ -528,15 +505,12 @@ const slides = [
 
 export default function PitchDeck() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [direction, setDirection] = useState(0);
 
   const nextSlide = useCallback(() => {
-    setDirection(1);
     setCurrentSlide((p) => (p === slides.length - 1 ? p : p + 1));
   }, []);
 
   const prevSlide = useCallback(() => {
-    setDirection(-1);
     setCurrentSlide((p) => (p === 0 ? p : p - 1));
   }, []);
 
@@ -558,7 +532,7 @@ export default function PitchDeck() {
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-kast-teal/[0.03] rounded-full blur-[100px] pointer-events-none" />
 
       <div className="absolute top-0 left-0 w-full h-[2px] z-50 bg-white/5">
-        <motion.div className="h-full bg-kast-teal" initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }} />
+        <div className="h-full bg-kast-teal" style={{ width: `${progress}%` }} />
       </div>
 
       <div className="absolute top-0 left-0 w-full z-50 px-6 lg:px-12 py-5 flex items-center gap-3">
@@ -569,24 +543,14 @@ export default function PitchDeck() {
       </div>
 
       <div className="relative flex-1 z-10 w-full h-full">
-        <AnimatePresence mode="wait" initial={false} custom={direction}>
-          <motion.div 
+        
+          <div 
             key={currentSlide} 
-            custom={direction}
-            variants={{
-              enter: (dir) => ({ opacity: 0, x: dir * 40, y: 0 }),
-              center: { opacity: 1, x: 0, y: 0 },
-              exit: (dir) => ({ opacity: 0, x: -dir * 40, y: 0 }),
-            }}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ duration: 0.35, ease }}
             className="absolute inset-0 w-full h-full"
           >
             {slides[currentSlide].content}
-          </motion.div>
-        </AnimatePresence>
+          </div>
+        
       </div>
 
       <div className="absolute bottom-0 left-0 w-full p-6 z-50 flex justify-between items-center bg-gradient-to-t from-black via-black/80 to-transparent">
