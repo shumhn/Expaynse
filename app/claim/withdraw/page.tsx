@@ -576,11 +576,19 @@ export default function ClaimWithdrawPage() {
 
   const handleClaimSalary = async () => {
     if (!publicKey || !signTransaction || !signMessage || !primaryPayrollStream?.stream) return;
-    const amount = parseFloat(requestAmount);
+    
+    let amount = parseFloat(requestAmount);
+    // Auto-fill max amount if empty or invalid but max is available
     if (isNaN(amount) || amount <= 0) {
-      toast.error("Please enter a valid amount");
-      return;
+      if (requestMaxUsdc > 0) {
+        amount = requestMaxUsdc;
+        setRequestAmount(requestMaxUsdc.toFixed(6));
+      } else {
+        toast.error("Please enter a valid amount");
+        return;
+      }
     }
+
     if (!hasLiveSnapshot) {
       toast.error("Live PER snapshot is required. Refresh and sign first.");
       return;
@@ -821,7 +829,7 @@ export default function ClaimWithdrawPage() {
 
         <div className="w-full flex flex-col gap-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 w-full">
-            <div className="rounded-[32px] border border-white/10 bg-[#0b0b0d] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.4)] sm:p-6 flex flex-col justify-between">
+            <div className="order-2 rounded-[32px] border border-white/10 bg-[#0b0b0d] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.4)] sm:p-6 flex flex-col justify-between lg:order-2">
               <div className="space-y-6">
                 <div>
                   <label className="mb-3 block px-1 text-[10px] font-bold uppercase tracking-widest text-[#8f8f95]">
@@ -918,7 +926,11 @@ export default function ClaimWithdrawPage() {
                       disabled={
                         initializingPrivateAccount || !registeredEmployeeWallet
                       }
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-amber-300/30 bg-amber-500/20 py-4 text-[11px] font-bold uppercase tracking-widest text-amber-200 transition-all hover:bg-amber-500/30 disabled:opacity-40"
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border py-4 text-[11px] font-bold uppercase tracking-widest transition-all disabled:opacity-40 disabled:animate-none disabled:scale-100 ${
+                        !canUsePrivateBalance && registeredEmployeeWallet
+                          ? "bg-emerald-500 border-emerald-400 text-black hover:bg-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.6)] ring-2 ring-emerald-500 ring-offset-4 ring-offset-[#0b0b0d] animate-pulse hover:animate-none scale-[1.02]"
+                          : "border-amber-300/30 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30"
+                      }`}
                     >
                       {initializingPrivateAccount ? (
                         <Loader2 className="animate-spin" size={16} />
@@ -926,7 +938,7 @@ export default function ClaimWithdrawPage() {
                         <ShieldCheck size={16} />
                       )}
                       {registeredEmployeeWallet
-                        ? "Initialize First"
+                        ? "Initialize Private Wallet"
                         : "No Employee Setup"}
                     </button>
                   ) : (
@@ -950,7 +962,11 @@ export default function ClaimWithdrawPage() {
                           !isValidWithdrawRecipient ||
                           (withdrawAmount.trim() !== "" && !isValidAmount)
                         }
-                        className="flex h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-[#1eba98] px-6 text-[11px] font-bold uppercase tracking-widest text-black shadow-lg transition-all hover:bg-[#18a786] disabled:opacity-30"
+                        className={`flex h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-[#1eba98] px-6 text-[11px] font-bold uppercase tracking-widest text-black transition-all hover:bg-[#18a786] disabled:opacity-30 disabled:animate-none disabled:scale-100 ${
+                          privBalanceNum >= 0.000001 && requestMaxUsdc < 0.000001 && isValidWithdrawRecipient && isValidAmount && !withdrawing
+                            ? "shadow-[0_0_40px_rgba(30,186,152,0.6)] ring-2 ring-[#1eba98] ring-offset-4 ring-offset-[#0b0b0d] animate-pulse hover:animate-none scale-[1.02]"
+                            : "shadow-lg"
+                        }`}
                       >
                         {withdrawing ? (
                           <Loader2 className="animate-spin" size={16} />
@@ -967,7 +983,7 @@ export default function ClaimWithdrawPage() {
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-white/10 bg-[#0b0b0d] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.4)] sm:p-6 flex flex-col justify-between">
+            <div className="order-1 rounded-[32px] border border-white/10 bg-[#0b0b0d] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.4)] sm:p-6 flex flex-col justify-between lg:order-1">
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-white">
@@ -1123,7 +1139,11 @@ export default function ClaimWithdrawPage() {
                       requestMaxUsdc <= 0 ||
                       hasPendingRequest
                     }
-                    className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#1eba98] px-6 text-[11px] font-bold uppercase tracking-widest text-black shadow-sm transition-all hover:bg-[#18a786] disabled:opacity-30"
+                    className={`flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#1eba98] px-6 text-[11px] font-bold uppercase tracking-widest text-black transition-all hover:bg-[#18a786] disabled:opacity-30 disabled:animate-none disabled:scale-100 ${
+                      requestMaxUsdc >= 0.000001 && !hasPendingRequest && hasLiveSnapshot
+                        ? "shadow-[0_0_40px_rgba(30,186,152,0.6)] ring-2 ring-[#1eba98] ring-offset-4 ring-offset-[#0b0b0d] animate-pulse hover:animate-none scale-[1.02]"
+                        : "shadow-sm"
+                    }`}
                   >
                     {submittingRequest ? (
                       <Loader2 className="animate-spin" size={16} />
