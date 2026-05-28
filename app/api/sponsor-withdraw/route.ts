@@ -56,35 +56,7 @@ export async function POST(req: NextRequest) {
       "confirmed",
     );
 
-    // --- 2. Always Pre-fund exactly 0.00051 SOL for MagicBlock protocol fee ---
-    // MagicBlock explicitly deducts 0.0005 SOL from the owner.
-    // Even if the employee has their own SOL, we want the Company to pay for this, 
-    // so we unconditionally send exactly the amount they are about to lose.
-    const employeePub = new PublicKey(owner);
-    const MAGICBLOCK_PROTOCOL_FEE = 0.0005;
-    const fundAmount = MAGICBLOCK_PROTOCOL_FEE + 0.00001; // tiny buffer
-
-    console.log(`[sponsor-withdraw] Pre-funding employee with ${fundAmount} SOL so they don't spend their personal money.`);
-    
-    const { SystemProgram, Transaction } = await import("@solana/web3.js");
-    const fundTx = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: sponsor.publicKey,
-        toPubkey: employeePub,
-        lamports: Math.ceil(fundAmount * 1e9),
-      })
-    );
-    
-    const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
-    fundTx.recentBlockhash = blockhash;
-    fundTx.feePayer = sponsor.publicKey;
-    fundTx.sign(sponsor);
-    
-    const fundSig = await conn.sendRawTransaction(fundTx.serialize(), { skipPreflight: false });
-    await conn.confirmTransaction({ signature: fundSig, blockhash, lastValidBlockHeight }, "confirmed");
-    console.log(`[sponsor-withdraw] Pre-funded exact amount. Sig: ${fundSig}`);
-
-    // --- 3. Call MagicBlock withdraw API to get unsigned tx ---
+    // --- 2. Call MagicBlock withdraw API to get unsigned tx ---
     const buildRes = await withdraw(owner, amount, token);
     if (!buildRes.transactionBase64) {
       return NextResponse.json(
@@ -93,10 +65,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- 4. Decompile and reconstruct the transaction ---
+    // --- 3. Decompile and reconstruct the transaction ---
     const tx = deserializeTx(buildRes.transactionBase64);
     
     const mintPub = new PublicKey(DEVNET_USDC);
+    const employeePub = new PublicKey(owner);
     const employeeAta = await getAssociatedTokenAddress(mintPub, employeePub);
     const ataInfo = await conn.getAccountInfo(employeeAta);
 
@@ -109,8 +82,24 @@ export async function POST(req: NextRequest) {
       allInstructions = [...tx.instructions];
     }
 
+    const { SystemProgram, Transaction } = await import("@solana/web3.js");
+
+    // --- 4. Pre-fund exact MagicBlock protocol fee within the same transaction ---
+    // MagicBlock explicitly deducts 0.0005 SOL from the owner.
+    // To avoid rent-exemption errors for empty wallets, we fund exactly this amount
+    // in the same transaction so the final balance change is 0.
+    const MAGICBLOCK_PROTOCOL_FEE = 0.0005;
+    
+    const fundIx = SystemProgram.transfer({
+      fromPubkey: sponsor.publicKey,
+      toPubkey: employeePub,
+      lamports: Math.ceil(MAGICBLOCK_PROTOCOL_FEE * 1e9),
+    });
+    // Add funding instruction before MagicBlock instructions
+    allInstructions.unshift(fundIx);
+
     // Check if employee's ATA exists; if not, prepend creation instruction
-    // with sponsor as payer
+    // with sponsor as payer (must be before funding if it costs lamports, but ATA creation costs lamports from payer, not owner)
     if (!ataInfo) {
       const createAtaIx = createAssociatedTokenAccountInstruction(
         sponsor.publicKey, // payer
@@ -119,10 +108,10 @@ export async function POST(req: NextRequest) {
         mintPub            // mint
       );
       // Avoid duplicating the initATA instruction if MagicBlock already added it
-      // (MagicBlock's `initAtasIfMissing` uses the owner as payer, so we replace it)
       allInstructions = allInstructions.filter(
         ix => !(ix.programId.equals(createAtaIx.programId) && ix.keys.some(k => k.pubkey.equals(employeeAta)))
       );
+      // Put ATA creation at the very beginning
       allInstructions.unshift(createAtaIx);
     }
 
