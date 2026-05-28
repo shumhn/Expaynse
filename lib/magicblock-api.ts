@@ -276,6 +276,16 @@ async function refreshRecentBlockhash(
   conn: Connection,
   tx: Transaction | VersionedTransaction
 ) {
+  // Check if transaction is already partially signed.
+  // If it is, changing the blockhash will invalidate existing signatures (like a Sponsor's signature).
+  const isPartiallySigned = tx instanceof VersionedTransaction
+    ? tx.signatures.some(sig => sig.some(byte => byte !== 0))
+    : tx.signatures.some(sig => sig.signature !== null);
+
+  if (isPartiallySigned) {
+    return tx;
+  }
+
   const latest = await conn.getLatestBlockhash("confirmed");
 
   if (tx instanceof VersionedTransaction) {

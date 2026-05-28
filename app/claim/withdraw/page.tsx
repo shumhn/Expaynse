@@ -153,7 +153,7 @@ export default function ClaimWithdrawPage() {
         const response = await walletAuthenticatedFetch({
           wallet: publicKey.toBase58(),
           signMessage,
-          path: `/api/history?scope=employee`,
+          path: `/api/history?scope=employee&wallet=${publicKey.toBase58()}`,
         });
         const json = (await response.json()) as {
           claimRecords?: any[];
@@ -307,17 +307,36 @@ export default function ClaimWithdrawPage() {
       const baseBalanceBefore = isOwnWalletDestination
         ? await getBalance(publicKey.toBase58()).catch(() => null)
         : null;
-      const buildRes = await privateTransfer(
-        publicKey.toBase58(),
-        withdrawRecipientTrimmed,
-        amountToWithdraw,
-        undefined,
-        activeToken,
-        {
-          fromBalance: "ephemeral",
-          toBalance: "base",
-        },
-      );
+      let buildRes;
+      if (isOwnWalletDestination) {
+        // Use sponsored withdraw — Sponsor wallet pays all SOL fees
+        const sponsorRes = await fetch("/api/sponsor-withdraw", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            owner: publicKey.toBase58(),
+            amount: amountToWithdraw,
+            token: activeToken,
+          }),
+        });
+        if (!sponsorRes.ok) {
+          const errBody = await sponsorRes.json().catch(() => ({}));
+          throw new Error(errBody.error || "Sponsored withdrawal failed");
+        }
+        buildRes = await sponsorRes.json();
+      } else {
+        buildRes = await privateTransfer(
+          publicKey.toBase58(),
+          withdrawRecipientTrimmed,
+          amountToWithdraw,
+          undefined,
+          activeToken,
+          {
+            fromBalance: "ephemeral",
+            toBalance: "base",
+          },
+        );
+      }
 
       if (!buildRes.transactionBase64) {
         throw new Error("API did not return a transaction");
@@ -375,7 +394,7 @@ export default function ClaimWithdrawPage() {
       if (signMessage) {
         try {
           await walletAuthenticatedFetch({
-            path: "/api/history",
+            path: `/api/history?wallet=${publicKey.toBase58()}`,
             method: "POST",
             signMessage,
             wallet: publicKey.toBase58(),
@@ -456,7 +475,7 @@ export default function ClaimWithdrawPage() {
       if (publicKey && signMessage) {
         try {
           await walletAuthenticatedFetch({
-            path: "/api/history",
+            path: `/api/history?wallet=${publicKey.toBase58()}`,
             method: "POST",
             signMessage,
             wallet: publicKey.toBase58(),
@@ -678,7 +697,7 @@ export default function ClaimWithdrawPage() {
         try {
           const claimAmountUsdc = parseFloat(requestAmount) || 0;
           await walletAuthenticatedFetch({
-            path: "/api/history",
+            path: `/api/history?wallet=${publicKey.toBase58()}`,
             method: "POST",
             signMessage,
             wallet: publicKey.toBase58(),
