@@ -82,7 +82,7 @@ export async function drainPendingHistory(input: {
       const res = await walletAuthenticatedFetch({
         wallet: input.wallet,
         signMessage: input.signMessage,
-        path: "/api/history",
+        path: `/api/history?wallet=${input.wallet}`,
         method: "POST",
         body: item,
       });

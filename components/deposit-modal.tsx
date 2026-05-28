@@ -141,7 +141,7 @@ export function DepositModal({ isOpen, onClose, baseBalance = 0, privateBalance 
         if (signMessage) {
           try {
             await walletAuthenticatedFetch({
-              path: "/api/history",
+              path: `/api/history?wallet=${owner}`,
               method: "POST",
               signMessage,
               wallet: owner,
