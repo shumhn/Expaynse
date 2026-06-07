@@ -63,6 +63,10 @@ export function Hero() {
                         <Link href="/dashboard" className="inline-flex px-8 py-3 bg-kast-teal text-black font-bold rounded-full hover:scale-105 transition-transform border-2 border-kast-teal hover:bg-transparent hover:text-kast-teal">
                             Launch App
                         </Link>
+                        <a href="https://x.com/magicblock/status/2059677948651978984" target="_blank" rel="noopener noreferrer" className="inline-flex px-8 py-3 bg-white/10 text-white font-bold rounded-full hover:scale-105 transition-transform border-2 border-white/30 hover:bg-white/20 items-center gap-2 backdrop-blur-sm shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M8 5v14l11-7z"/></svg>
+                            Watch demo
+                        </a>
                         <Link href="/claim/dashboard" className="inline-flex px-8 py-3 bg-transparent text-kast-teal font-bold rounded-full hover:scale-105 transition-transform border-2 border-kast-teal hover:bg-kast-teal hover:text-black">
                             Claim Salary
                         </Link>
