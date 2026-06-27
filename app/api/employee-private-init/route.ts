@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       ? "unregistered"
       : initializedEmployee?.privateRecipientInitStatus ?? "pending";
     const message = !registered
-      ? "This wallet is not registered as a Expaynse employee yet."
+      ? "This wallet is not registered as an Expaynse employee yet."
       : initialized
         ? "Private payroll account is initialized."
         : status === "processing"
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     if (employees.length === 0) {
       return badRequest(
-        "This wallet is not registered as a Expaynse employee yet.",
+        "This wallet is not registered as an Expaynse employee yet.",
         403,
       );
     }
