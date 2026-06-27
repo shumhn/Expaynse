@@ -295,31 +295,6 @@ sequenceDiagram
 - **Auditor Access:** Time-limited, revocable tokens grant read-only access to payroll data for compliance purposes without exposing the employer's signing authority.
 - **Monthly Caps:** Configurable per-employee `monthlyCapState` prevents overpayment and drains.
 
----
-
-## AI Model Routing
-
-Expaynse now includes a server-side Gemini routing layer for Q&A and vectorization:
-
-- `POST /api/ai/answer` uses model routing with retries:
-  - `mode: \"fast\"` -> `GEMINI_FAST_MODEL` -> `GEMINI_DEFAULT_ANSWER_MODEL` -> `GEMINI_QUALITY_FALLBACK_MODEL`
-  - `mode: \"default\"` -> `GEMINI_DEFAULT_ANSWER_MODEL` -> `GEMINI_QUALITY_FALLBACK_MODEL` -> `GEMINI_FAST_MODEL`
-  - `mode: \"quality\"` -> `GEMINI_QUALITY_FALLBACK_MODEL` -> `GEMINI_DEFAULT_ANSWER_MODEL` -> `GEMINI_FAST_MODEL`
-- `POST /api/ai/embed` uses `GEMINI_EMBED_MODEL` for embeddings.
-- Both routes require wallet authorization headers/session, same as the rest of the API.
-
-Set these environment variables in `.env`:
-
-```bash
-GEMINI_API_KEY=...
-GEMINI_FAST_MODEL=models/gemini-3.1-flash-lite
-GEMINI_DEFAULT_ANSWER_MODEL=models/gemini-2.5-flash
-GEMINI_QUALITY_FALLBACK_MODEL=models/gemini-2.5-pro
-GEMINI_EMBED_MODEL=models/gemini-embedding-2
-```
-
----
-
 ## Getting Started
 
 ### Prerequisites
